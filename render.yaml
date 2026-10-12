@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: stanza-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false # e.g. https://stanza.vercel.app
+      - key: GEMINI_MODEL
+        value: gemini-3-flash-preview
+      - key: GROQ_MAIN_MODEL
+        value: openai/gpt-oss-120b
+      - key: GROQ_SMALL_MODEL
+        value: openai/gpt-oss-20b
+      - key: GROQ_WHISPER_MODEL
+        value: whisper-large-v3-turbo

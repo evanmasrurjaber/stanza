@@ -1,0 +1,33 @@
+{
+  "name": "stanza-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=../.env src/index.js",
+    "start": "node src/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "smoke": "node --env-file-if-exists=../.env scripts/smoke-providers.js",
+    "eval:router": "node --env-file-if-exists=../.env scripts/eval-router.js"
+  },
+  "dependencies": {
+    "@google/genai": "^2.28.0",
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.1",
+    "fastest-levenshtein": "^1.0.16",
+    "ffmpeg-static": "^5.3.0",
+    "ffprobe-static": "^3.1.0",
+    "file-type": "^22.1.1",
+    "groq-sdk": "^1.6.0",
+    "helmet": "^8.3.0",
+    "multer": "^2.4.0",
+    "zod": "^4.6.6"
+  },
+  "devDependencies": {
+    "supertest": "^7.3.1",
+    "vitest": "^5.0.4"
+  }
+}
