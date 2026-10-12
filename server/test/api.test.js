@@ -263,18 +263,53 @@ describe('POST /api/transcribe', () => {
     },
   };
 
-  it('runs validate → probe → compress → transcribe → segment with progress, then cleans up', async () => {
+  it('passes a small file straight to transcription (no re-encoding), with progress, then cleans up', async () => {
     const before = new Set(fs.existsSync(path.join(os.tmpdir(), 'stanza-uploads')) ? fs.readdirSync(path.join(os.tmpdir(), 'stanza-uploads')) : []);
     const res = await request(appWith({ whisper })).post('/api/transcribe').set('Accept', NDJSON).attach('audio', wav, 'tone.wav');
     const events = ndjson(res.text);
-    expect(events.filter((e) => e.type === 'stage').map((e) => e.stage)).toEqual(['validating', 'probing', 'compressing', 'transcribing', 'segmenting']);
-    expect(events.some((e) => e.type === 'progress' && e.stage === 'compressing' && e.percent === 100)).toBe(true);
+    expect(events.filter((e) => e.type === 'stage').map((e) => e.stage)).toEqual(['validating', 'probing', 'transcribing', 'segmenting']);
+    expect(events.at(-1).data.processing).toBe('pass');
     const result = events.at(-1);
     expect(result.type).toBe('result');
     expect(result.data).toMatchObject({ hasTimestamps: true, source: 'audio', provider: 'Groq Whisper' });
     const after = fs.readdirSync(path.join(os.tmpdir(), 'stanza-uploads')).filter((f) => !before.has(f));
     expect(after).toEqual([]);
   }, 30_000);
+
+  it('splits a large compressed file by stream copy and stitches the timestamps', async () => {
+    const mp3 = path.join(os.tmpdir(), `stanza-test-${process.pid}.mp3`);
+    spawnSync(ffmpegPath, ['-y', '-f', 'lavfi', '-i', 'anoisesrc=d=60:c=pink:a=0.1', '-ac', '1', '-c:a', 'libmp3lame', '-b:a', '64k', mp3]);
+    const size = fs.statSync(mp3).size;
+    const calls = [];
+    const chunkWhisper = {
+      name: 'Groq Whisper',
+      model: 'test',
+      async transcribe(file) {
+        calls.push({ file, size: fs.statSync(file).size });
+        // Each chunk reports one segment every 2 s of its own (chunk-relative) time.
+        return { language: 'en', segments: Array.from({ length: 12 }, (_, i) => ({ text: `${segments[i].text}`, start: i * 2, end: i * 2 + 2 })) };
+      },
+    };
+    const cfg = testConfig();
+    const app = createApp({
+      config: { ...cfg, limits: { ...cfg.limits, compressedAudioBytes: Math.ceil(size / 2.5), copyChunkMinSeconds: 5 } },
+      providers: { ...noProviders, whisper: chunkWhisper },
+    });
+    const res = await request(app).post('/api/transcribe').set('Accept', NDJSON).attach('audio', mp3, 'long.mp3');
+    const events = ndjson(res.text);
+    const stages = events.filter((e) => e.type === 'stage').map((e) => e.stage);
+    expect(stages).toEqual(['validating', 'probing', 'splitting', 'transcribing', 'segmenting']);
+    expect(stages).not.toContain('compressing');
+    const result = events.at(-1).data;
+    expect(result.processing).toBe('split');
+    expect(calls.length).toBeGreaterThanOrEqual(3);
+    for (const c of calls) expect(c.size).toBeLessThan(Math.ceil(size / 2.5));
+    // Times continue across chunks instead of restarting at 0.
+    const starts = result.segments.map((s) => s.start);
+    expect(starts.every((t, i) => i === 0 || t >= starts[i - 1])).toBe(true);
+    expect(Math.max(...starts)).toBeGreaterThan(20);
+    fs.rmSync(mp3, { force: true });
+  }, 60_000);
 
   it('rejects a text file renamed to .mp3 by its content', async () => {
     const res = await request(appWith({ whisper })).post('/api/transcribe').attach('audio', Buffer.from('just some text, not audio'), 'fake.mp3');

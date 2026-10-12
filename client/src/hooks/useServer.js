@@ -57,3 +57,20 @@ export function useServer() {
 
   return { ...state, recheck };
 }
+
+const KEEP_AWAKE_EVERY_MS = 4 * 60_000;
+
+/**
+ * Render's free tier sleeps after 15 minutes without *incoming* requests. A long job's streamed
+ * progress is outgoing traffic and does not count, so while work is running we send a tiny health
+ * request every few minutes to keep the instance (and the job on it) alive.
+ */
+export function useKeepAwake(active) {
+  useEffect(() => {
+    if (!active) return;
+    const t = setInterval(() => {
+      getJson('/api/health', { timeoutMs: 10_000 }).catch(() => {});
+    }, KEEP_AWAKE_EVERY_MS);
+    return () => clearInterval(t);
+  }, [active]);
+}

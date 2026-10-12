@@ -6,7 +6,7 @@ import { Contents } from './components/Contents.jsx';
 import { Chapters, EditionCtx, Overview, Takeaways, Transcript } from './components/Reading.jsx';
 import { Quiz } from './components/Quiz.jsx';
 import { RevisionDock } from './components/RevisionDock.jsx';
-import { useServer } from './hooks/useServer.js';
+import { useKeepAwake, useServer } from './hooks/useServer.js';
 import { useEdition } from './hooks/useEdition.js';
 
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -77,6 +77,7 @@ export default function App() {
   const [railOpen, setRailOpen] = useState(false);
   const edition = ed.edition;
   const ready = ed.phase === 'ready' && edition?.overview;
+  useKeepAwake(ed.phase === 'working' || edition?.quizStatus === 'working' || ed.revision.status === 'working');
 
   const audio = useAudio(ready ? edition.audioUrl : null);
   const segById = useMemo(() => new Map((edition?.segments ?? []).map((s) => [s.id, s])), [edition?.segments]);

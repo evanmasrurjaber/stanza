@@ -61,6 +61,8 @@ export function loadConfig(env = process.env) {
       audioSeconds: c.MAX_AUDIO_SECONDS,
       // Groq free tier caps a single transcription upload at 25 MB; keep a margin.
       compressedAudioBytes: 24 * 1024 * 1024,
+      // Below this chunk length, stream-copy splitting would make too many requests; re-encode instead.
+      copyChunkMinSeconds: 120,
       audioExtensions: ['mp3', 'm4a', 'wav', 'ogg', 'webm', 'flac'],
       transcriptExtensions: ['txt', 'srt', 'vtt'],
     },

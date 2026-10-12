@@ -9,7 +9,7 @@ The server is **stateless**: the browser keeps `segments` and `result` and sends
 |---|---|---|
 | 0. Wake server | `GET /api/health` (poll every 3 s until 200) | – |
 | 1a. Paste/upload transcript | `POST /api/transcript` | (instant) |
-| 1b. *or* upload audio | `POST /api/transcribe` | validating → probing → compressing (real %) → transcribing (estimated %) → segmenting |
+| 1b. *or* upload audio | (browser) then `POST /api/transcribe` | preparing (in-browser compression, real %) → uploading (real %) → validating → probing → [splitting, only for large compressed files] → transcribing (per-part progress) → segmenting. `compressing` appears only for uncompressed files the browser couldn't shrink. |
 | 2. Overview | `POST /api/generate/overview` | summarizing (estimated %) |
 | 3. Quiz | `POST /api/generate/quiz` | writing_quiz (estimated %) → checking_quotes |
 | 4. Revisions | `POST /api/revise` | routing → revising |

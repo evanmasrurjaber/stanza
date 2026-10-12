@@ -48,12 +48,15 @@ function run(bin, args, { signal, timeoutMs, onStdoutLine } = {}) {
   });
 }
 
-/** Duration in seconds via ffprobe. Unreadable files are an input problem, not a server one. */
-export async function probeDuration(file, { signal } = {}) {
+/**
+ * Duration, codec and bitrate via ffprobe. Unreadable files are an input problem, not a server one.
+ * Returns { duration, codec, bitRate } where bitRate is bits/second of the whole file.
+ */
+export async function probeAudio(file, { signal } = {}) {
   const { code, stdout, stderr, timedOut } = await run(
     ffprobeStatic.path,
-    ['-v', 'error', '-show_entries', 'format=duration:stream=codec_type', '-of', 'json', file],
-    { signal, timeoutMs: 30_000 },
+    ['-v', 'error', '-show_entries', 'format=duration,bit_rate:stream=codec_type,codec_name', '-of', 'json', file],
+    { signal, timeoutMs: 60_000 },
   );
   if (timedOut) throw audioProcessingFailed('Reading the audio file took too long.');
   let info;
@@ -62,25 +65,49 @@ export async function probeDuration(file, { signal } = {}) {
   } catch {
     info = null;
   }
-  const hasAudio = info?.streams?.some((s) => s.codec_type === 'audio');
+  const audio = info?.streams?.find((s) => s.codec_type === 'audio');
   const duration = Number(info?.format?.duration);
-  if (code !== 0 || !hasAudio || !Number.isFinite(duration) || duration <= 0) {
+  if (code !== 0 || !audio || !Number.isFinite(duration) || duration <= 0) {
     throw audioUnreadable('This file could not be read as audio. It may be corrupted or not really an audio file.', new Error(stderr));
   }
-  return duration;
+  return { duration, codec: audio.codec_name ?? null, bitRate: Number(info.format.bit_rate) || null };
+}
+
+/** Back-compat helper used by older callers/tests. */
+export async function probeDuration(file, opts) {
+  return (await probeAudio(file, opts)).duration;
+}
+
+/**
+ * Cut [start, start + duration) out of `input` WITHOUT re-encoding (stream copy). This costs
+ * almost no CPU, which matters on a free instance where re-encoding runs ~60x slower than a laptop.
+ */
+export async function cutCopy(input, output, { start, duration, signal }) {
+  const { code, stderr, timedOut } = await run(
+    ffmpegPath,
+    ['-hide_banner', '-nostats', '-y', '-ss', String(start), '-t', String(duration), '-i', input, '-map', '0:a:0', '-vn', '-c', 'copy', output],
+    { signal, timeoutMs: 3 * 60_000 },
+  );
+  if (timedOut) throw audioProcessingFailed('Splitting the audio took too long.');
+  if (code !== 0) throw audioUnreadable('The audio could not be split. The file may be corrupted.', new Error(stderr));
 }
 
 /**
  * Re-encode to 16 kHz mono Opus (Whisper downsamples to 16 kHz mono anyway, so nothing useful is lost).
- * Reports real progress from ffmpeg's `-progress` output.
+ * This is the slow path (uncompressed WAV/FLAC that the browser could not compress); it uses the
+ * fastest Opus encoder setting. Reports real progress from ffmpeg's `-progress` output.
  */
 export async function compressForSpeech(input, output, { durationSec, bitrate = '24k', signal, onProgress } = {}) {
   const started = Date.now();
   // Generous: Render's free instance has a small CPU share.
-  const timeoutMs = Math.max(3 * 60_000, durationSec * 1000 * 0.5);
+  const timeoutMs = Math.max(5 * 60_000, durationSec * 1000 * 0.6);
   const { code, stderr, timedOut } = await run(
     ffmpegPath,
-    ['-hide_banner', '-nostats', '-y', '-i', input, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'libopus', '-b:a', bitrate, '-application', 'voip', '-progress', 'pipe:1', output],
+    [
+      '-hide_banner', '-nostats', '-y', '-i', input, '-vn', '-ac', '1', '-ar', '16000',
+      '-c:a', 'libopus', '-b:a', bitrate, '-application', 'voip', '-compression_level', '0',
+      '-progress', 'pipe:1', output,
+    ],
     {
       signal,
       timeoutMs,

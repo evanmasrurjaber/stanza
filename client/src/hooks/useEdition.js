@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { postJson, postStream, uploadAudio } from '../api/client.js';
+import { BROWSER_COMPRESS_MIN_BYTES, compressAudioInBrowser } from '../lib/compressAudio.js';
+import { megabytes } from '../lib/format.js';
 
 const QUESTION_COUNT = 6;
 
@@ -47,6 +49,37 @@ function applyEvent(step, evt) {
 }
 
 /**
+ * Compress large audio on the user's device before upload (seconds there vs. many minutes on the
+ * free server). Falls back to the original file, with a notice, when the browser can't do it.
+ */
+async function prepareAudio(file, { signal, onEvent, patch }) {
+  if (file.size < BROWSER_COMPRESS_MIN_BYTES) return file;
+  onEvent({ type: 'stage', stage: 'preparing', label: 'Compressing audio on your device', percent: 0, message: `${megabytes(file.size)} original` });
+  const started = Date.now();
+  let last = 0;
+  try {
+    const out = await compressAudioInBrowser(file, {
+      signal,
+      onProgress: (p) => {
+        if (Date.now() - last < 250 && p < 1) return;
+        last = Date.now();
+        const elapsed = (Date.now() - started) / 1000;
+        patch((s) => ({ ...s, percent: Math.round(p * 100), etaSeconds: p > 0.03 ? (elapsed / p) * (1 - p) : null, estimated: false }));
+      },
+    });
+    if (out && out.size < file.size) {
+      patch((s) => ({ ...s, percent: 100, etaSeconds: null, message: `${megabytes(file.size)} → ${megabytes(out.size)} in ${Math.max(1, Math.round((Date.now() - started) / 1000))} s` }));
+      return out;
+    }
+    onEvent({ type: 'notice', level: 'info', message: "This browser can't compress this file, so the original will be uploaded and prepared on the server." });
+  } catch (err) {
+    if (signal?.aborted) throw Object.assign(new Error('Cancelled.'), { category: 'aborted' });
+    onEvent({ type: 'notice', level: 'info', message: `Compressing on your device failed (${err.message}); uploading the original instead.` });
+  }
+  return file;
+}
+
+/**
  * The whole client workflow: source → overview → quiz, then revisions with undo.
  * The server is stateless, so this hook owns segments and results.
  */
@@ -82,8 +115,9 @@ export function useEdition({ onNetworkError } = {}) {
       const onEvent = (evt) => patchStep('source', (s) => applyEvent(s, evt));
       let data;
       if (input.kind === 'audio') {
-        patchStep('source', (s) => applyEvent(s, { type: 'stage', stage: 'uploading', label: 'Uploading audio', percent: 0 }));
-        data = await uploadAudio(input.file, {
+        const file = await prepareAudio(input.file, { signal, onEvent, patch: (fn) => patchStep('source', fn) });
+        patchStep('source', (s) => applyEvent(s, { type: 'stage', stage: 'uploading', label: 'Uploading audio', percent: 0, message: megabytes(file.size) }));
+        data = await uploadAudio(file, {
           signal,
           onEvent,
           onUploadProgress: (f) => patchStep('source', (s) => (s.stages.at(-1)?.stage === 'uploading' ? { ...s, upload: f, percent: Math.round(f * 100) } : s)),

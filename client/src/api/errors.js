@@ -3,10 +3,12 @@
  * and what the user can do about it.
  */
 export const STAGE_LABELS = {
+  preparing: 'Compressing audio on your device',
   uploading: 'Uploading audio',
   validating: 'Checking your file',
   probing: 'Reading audio details',
   compressing: 'Compressing audio',
+  splitting: 'Splitting audio into parts',
   transcribing: 'Producing transcript',
   segmenting: 'Splitting the transcript into sections',
   summarizing: 'Summarizing the episode',

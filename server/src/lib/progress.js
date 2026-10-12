@@ -10,6 +10,7 @@ export const STAGES = Object.freeze({
   validating: 'Checking your file',
   probing: 'Reading audio details',
   compressing: 'Compressing audio',
+  splitting: 'Splitting audio into parts',
   transcribing: 'Producing transcript',
   segmenting: 'Splitting the transcript into sections',
   summarizing: 'Summarizing the episode and building chapters',
