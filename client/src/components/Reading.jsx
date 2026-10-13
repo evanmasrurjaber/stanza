@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import { Play } from 'lucide-react';
+import { Play, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { clock, paraNumber, plural } from '../lib/format.js';
 
 /** { segById, cite(id), highlight: { id, n }, seek(seconds) | null } */
@@ -29,6 +29,44 @@ function Revised({ at }) {
   return <span className="revised">Revised</span>;
 }
 
+/** Fact-check status for a section: what an independent model confirmed against the cited paragraphs. */
+export function FactCheck({ verification, what = 'Each sentence', detail }) {
+  if (!verification) return null;
+  const { status, checker } = verification;
+  const by = checker ? ` by an independent model (${checker})` : '';
+  if (status === 'unchecked') {
+    return (
+      <span className="factcheck factcheck--off" title={verification.note ?? 'The independent fact-checker was unavailable.'}>
+        <ShieldAlert size={14} strokeWidth={2} aria-hidden="true" /> Not fact-checked
+      </span>
+    );
+  }
+  return (
+    <span className={`factcheck${status === 'partial' ? ' factcheck--partial' : ''}`} title={detail ?? `${what} was checked against the transcript paragraphs it cites${by}.`}>
+      <ShieldCheck size={14} strokeWidth={2} aria-hidden="true" /> {status === 'partial' ? 'Partly fact-checked' : 'Fact-checked'}
+    </span>
+  );
+}
+
+/** What the fact-check removed from a section, and why. Collapsed by default. */
+export function Removed({ items, noun }) {
+  if (!items?.length) return null;
+  return (
+    <details className="removed">
+      <summary>
+        {plural(items.length, noun)} removed by the fact-check
+      </summary>
+      <ul>
+        {items.map((r, i) => (
+          <li key={i}>
+            <span className="removed__text">“{r.text ?? r.question}”</span> <span className="removed__why">{r.reason}</span>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 function SectionHead({ id, children, revisedAt, aside }) {
   return (
     <div className="section__head">
@@ -42,19 +80,36 @@ function SectionHead({ id, children, revisedAt, aside }) {
 }
 
 export function Overview({ overview, revised }) {
+  const v = overview.verification;
+  const sentences = overview.summarySentences;
   return (
     <section className="section" aria-labelledby="h-summary" id="sec-summary" data-spy="summary">
-      <SectionHead id="h-summary" revisedAt={revised.summary}>
+      <SectionHead id="h-summary" revisedAt={revised.summary} aside={<FactCheck verification={v} />}>
         Summary
       </SectionHead>
       <div className="prose" key={revised.summary ?? 0}>
-        {overview.summary
-          .split(/\n{2,}/)
-          .filter(Boolean)
-          .map((p, i) => (
-            <p key={i}>{p}</p>
-          ))}
+        {sentences?.length ? (
+          <p>
+            {sentences.map((s, i) => (
+              <span key={i} className="sentence">
+                {s.text}
+                {s.segmentIds[0] && (
+                  <>
+                    {' '}
+                    <Cite id={s.segmentIds[0]} />
+                  </>
+                )}{' '}
+              </span>
+            ))}
+          </p>
+        ) : (
+          overview.summary
+            .split(/\n{2,}/)
+            .filter(Boolean)
+            .map((p, i) => <p key={i}>{p}</p>)
+        )}
       </div>
+      <Removed items={v?.removed?.filter((r) => r.section === 'summary')} noun="sentence" />
       {overview.themes.length > 0 && (
         <p className="themes">
           <span className="themes__label">Themes</span>
@@ -69,10 +124,10 @@ export function Overview({ overview, revised }) {
   );
 }
 
-export function Takeaways({ takeaways, revised }) {
+export function Takeaways({ takeaways, revised, verification }) {
   return (
     <section className="section" aria-labelledby="h-takeaways" id="sec-takeaways" data-spy="takeaways">
-      <SectionHead id="h-takeaways" revisedAt={revised.takeaways}>
+      <SectionHead id="h-takeaways" revisedAt={revised.takeaways} aside={<FactCheck verification={verification} what="Each takeaway" />}>
         Key takeaways
       </SectionHead>
       <ol className="takeaways">
@@ -92,6 +147,7 @@ export function Takeaways({ takeaways, revised }) {
           </li>
         ))}
       </ol>
+      <Removed items={verification?.removed?.filter((r) => r.section === 'takeaways')} noun="takeaway" />
     </section>
   );
 }

@@ -188,7 +188,7 @@ export default function App() {
           />
           <main className="reading" id="reading">
             <Overview overview={edition.overview} revised={edition.revised} />
-            <Takeaways takeaways={edition.overview.takeaways} revised={edition.revised} />
+            <Takeaways takeaways={edition.overview.takeaways} revised={edition.revised} verification={edition.overview.verification} />
             <Chapters
               chapters={edition.overview.chapters}
               revised={edition.revised}

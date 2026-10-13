@@ -14,6 +14,7 @@ export const STAGE_LABELS = {
   summarizing: 'Summarizing the episode',
   writing_quiz: 'Writing quiz questions',
   checking_quotes: 'Checking quiz answers against the transcript',
+  verifying: 'Fact-checking against the transcript',
   routing: 'Understanding your request',
   revising: 'Applying your revision',
 };

@@ -16,6 +16,7 @@ export const STAGES = Object.freeze({
   summarizing: 'Summarizing the episode and building chapters',
   writing_quiz: 'Writing quiz questions',
   checking_quotes: 'Checking quiz answers against the transcript',
+  verifying: 'Fact-checking against the transcript',
   routing: 'Understanding your request',
   revising: 'Applying your revision',
 });

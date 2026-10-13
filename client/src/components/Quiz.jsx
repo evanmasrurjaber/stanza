@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, RotateCcw, X } from 'lucide-react';
-import { Cite } from './Reading.jsx';
+import { Cite, FactCheck, Removed } from './Reading.jsx';
 import { Errata } from './Errata.jsx';
 import { Notices } from './Proof.jsx';
 import { eta, plural } from '../lib/format.js';
@@ -159,21 +159,17 @@ export function Quiz({ edition, step, onRetry }) {
           Quiz
         </h2>
         {revised.quiz && <span className="revised">Revised</span>}
+        {quiz && <FactCheck verification={quiz.verification} detail="An independent model answered every question from its cited passage without seeing the answer key; only questions where it reached the same answer are kept." />}
       </div>
       {quizStatus === 'working' && !quiz && <QuizWorking step={step} />}
       {quizStatus === 'failed' && !quiz && <Errata error={quizError} onRetry={onRetry} retryLabel="Set the quiz again" />}
       {quiz && quiz.questions.length === 0 && (
-        <p className="aside-note">No question could be verified against the transcript, so none are shown. Try setting the quiz again.</p>
+        <p className="aside-note">No question passed the checks against the transcript, so none are shown. Try setting the quiz again.</p>
       )}
       {quiz && quiz.questions.length > 0 && (
         <>
           <QuizBody key={revised.quiz ?? 'first'} quiz={quiz} />
-          {quiz.dropped?.length > 0 && (
-            <p className="aside-note">
-              {plural(quiz.dropped.length, 'question')} {quiz.dropped.length === 1 ? 'was' : 'were'} removed because the supporting quote could not be found in the
-              transcript.
-            </p>
-          )}
+          <Removed items={quiz.dropped} noun="question" />
         </>
       )}
     </section>

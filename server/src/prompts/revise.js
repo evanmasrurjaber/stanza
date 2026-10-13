@@ -47,10 +47,13 @@ ${GROUNDING_RULES}
 const editorInstruction = (instruction) => `<editor_instruction>\n${instruction}\n</editor_instruction>`;
 
 export function summaryRevisionPrompt({ segments, overview, instruction }) {
+  const current = overview.summarySentences?.length
+    ? overview.summarySentences.map((s) => `- ${s.text} [${s.segmentIds.join(', ')}]`).join('\n')
+    : overview.summary;
   return `${formatTranscript(segments)}
 
 <current_summary>
-${overview.summary}
+${current}
 </current_summary>
 <current_themes>
 ${overview.themes.join('\n')}
@@ -58,7 +61,7 @@ ${overview.themes.join('\n')}
 
 ${editorInstruction(instruction)}
 
-Return the revised "summary" and "themes" (3–6 short phrases; keep the current ones unless the instruction affects them).`;
+Return the revised "summary" as 3–7 sentences, each an object with "text" and "segmentIds" (the 1–3 segment IDs that support it; only write what those segments say), and "themes" (3–6 short phrases; keep the current ones unless the instruction affects them).`;
 }
 
 export function takeawaysRevisionPrompt({ segments, overview, instruction }) {

@@ -35,8 +35,14 @@ export const LLM_ChapterDraft = z.object({
   explanation: z.string(),
 });
 
+// A sentence or takeaway with the transcript segments it is based on (cited so it can be fact-checked).
+export const LLM_Claim = z.object({
+  text: z.string(),
+  segmentIds: z.array(z.string()),
+});
+
 export const LLM_Overview = z.object({
-  summary: z.string(),
+  summary: z.array(LLM_Claim),
   themes: z.array(z.string()),
   takeaways: z.array(LLM_Takeaway),
   chapters: z.array(LLM_ChapterDraft),
@@ -80,14 +86,42 @@ export const LLM_Route = z.object({
 });
 
 // ---------- LLM output: section revisions ----------
-export const LLM_SummaryRevision = z.object({ summary: z.string(), themes: z.array(z.string()) });
+export const LLM_SummaryRevision = z.object({ summary: z.array(LLM_Claim), themes: z.array(z.string()) });
 export const LLM_TakeawaysRevision = z.object({ takeaways: z.array(LLM_Takeaway) });
 export const LLM_ChapterTextRevision = z.object({
   chapters: z.array(z.object({ id: z.string(), title: z.string(), explanation: z.string() })),
 });
 export const LLM_ChaptersRevision = z.object({ chapters: z.array(LLM_ChapterDraft) });
 
+// ---------- LLM output: fact-checking (judge) ----------
+export const VERDICTS = ['supported', 'overstated', 'unsupported', 'contradicted'];
+export const LLM_ClaimVerdicts = z.object({
+  results: z.array(z.object({ id: z.string(), verdict: z.enum(VERDICTS), reason: z.string() })),
+});
+export const QUIZ_CHOICES = ['A', 'B', 'C', 'D', 'none', 'multiple'];
+export const LLM_QuizVerdicts = z.object({
+  results: z.array(z.object({ id: z.string(), choice: z.enum(QUIZ_CHOICES), reason: z.string() })),
+});
+export const LLM_ClaimRepairs = z.object({
+  items: z.array(z.object({ id: z.string(), text: z.string(), segmentIds: z.array(z.string()) })),
+});
+
 // ---------- Final shapes (API responses, and input to /revise) ----------
+const CheckSchema = z.enum(['supported', 'unchecked']).optional();
+
+export const VerificationSchema = z.object({
+  status: z.enum(['checked', 'partial', 'unchecked']),
+  checker: z.string().nullable(),
+  removed: z.array(z.object({ section: z.string(), text: z.string(), reason: z.string() })).default([]),
+  repaired: z.number().int().nonnegative().default(0),
+  note: z.string().nullable().default(null),
+});
+
+const CitedSentenceSchema = z.object({
+  text: z.string().max(1500),
+  segmentIds: z.array(SegmentIdSchema).max(20),
+  check: CheckSchema,
+});
 export const ChapterSchema = z.object({
   id: z.string().regex(/^C\d+$/),
   startSegmentId: SegmentIdSchema,
@@ -100,9 +134,11 @@ export const ChapterSchema = z.object({
 
 export const OverviewSchema = z.object({
   summary: z.string().min(1).max(10_000),
+  summarySentences: z.array(CitedSentenceSchema).max(30).optional(),
   themes: z.array(z.string().max(300)).max(20),
-  takeaways: z.array(z.object({ text: z.string().max(1000), segmentIds: z.array(SegmentIdSchema).max(20) })).max(30),
+  takeaways: z.array(CitedSentenceSchema).max(30),
   chapters: z.array(ChapterSchema).min(1).max(40),
+  verification: VerificationSchema.optional(),
 });
 
 export const QuestionSchema = z.object({
@@ -114,11 +150,13 @@ export const QuestionSchema = z.object({
   quote: z.string().max(2000),
   segmentIds: z.array(SegmentIdSchema).min(1).max(20),
   difficulty: z.enum(DIFFICULTIES),
+  check: z.enum(['confirmed', 'unchecked']).optional(),
 });
 
 export const QuizSchema = z.object({
   questions: z.array(QuestionSchema).max(30),
   dropped: z.array(z.object({ question: z.string(), reason: z.string() })).default([]),
+  verification: VerificationSchema.optional(),
 });
 
 export const ResultSchema = z.object({

@@ -3,6 +3,7 @@ import { LLM_Quiz } from '../schemas/index.js';
 import { QUIZ_SYSTEM, quizPrompt } from '../prompts/quiz.js';
 import { checkQuote } from './quoteCheck.js';
 import { estimateLlmSeconds, startEstimate } from '../lib/progress.js';
+import { factCheckQuestions, verificationSummary } from './factcheck.js';
 
 /** Deterministic shuffle so the correct answer isn't always where the model put it (models favour A/B). */
 function shuffleOptions(options, answerIndex, seedText) {
@@ -83,40 +84,102 @@ export function validateQuiz(data, segments, { threshold, minQuestions, maxQuest
   return { value: { questions, dropped }, errors };
 }
 
-/** Call 2: facts-first quiz, verified against the transcript in code. */
-export async function generateQuiz({ segments, chapters, questionCount, difficulty = 'mixed', extraInstruction, config, providers, progress, signal }) {
+async function writeQuestions({ segments, chapters, questionCount, difficulty, extraInstruction, config, providers, progress, signal, minQuestions, idOffset = 0 }) {
   const user = quizPrompt({ segments, chapters, questionCount, difficulty, extraInstruction });
   const eta = estimateLlmSeconds(user.length) + 5;
-  progress.stage('writing_quiz', { etaSeconds: eta });
   const stop = startEstimate(progress, eta);
-  let result;
   try {
-    result = await generateStructured({
+    const result = await generateStructured({
       task: 'quiz',
       system: QUIZ_SYSTEM,
       user,
       schema: LLM_Quiz,
-      validate: (d) =>
-        validateQuiz(d, segments, {
-          threshold: config.quoteMatchThreshold,
-          minQuestions: Math.min(3, questionCount),
-          maxQuestions: questionCount,
-        }),
+      validate: (d) => validateQuiz(d, segments, { threshold: config.quoteMatchThreshold, minQuestions, maxQuestions: questionCount, idOffset }),
       providers: [providers.primary, providers.fallback],
       timeoutMs: config.llmTimeoutMs,
       progress,
       signal,
     });
+    return { ...result.data, provider: result.provider };
   } finally {
     stop();
   }
+}
 
-  const { questions, dropped } = result.data;
+const renumber = (questions) => questions.map((q, i) => ({ ...q, id: `Q${i + 1}` }));
+
+/**
+ * Call 2: facts-first quiz. Two layers of checking:
+ *   1. code: every supporting quote must appear in the cited transcript segments (validateQuiz)
+ *   2. independent judge, blind: it answers each question from the evidence without seeing the key;
+ *      questions it answers differently, or finds unanswerable/ambiguous, are dropped
+ * If too few questions survive, the missing ones are written once more and checked the same way.
+ */
+export async function generateQuiz({ segments, chapters, questionCount, difficulty = 'mixed', extraInstruction, config, providers, progress, signal }) {
+  const deps = { config, providers };
+  const minQuestions = Math.min(3, questionCount);
+  progress.stage('writing_quiz', { etaSeconds: estimateLlmSeconds(segments.reduce((n, s) => n + s.text.length, 0)) + 5 });
+  const first = await writeQuestions({ segments, chapters, questionCount, difficulty, extraInstruction, config, providers, progress, signal, minQuestions });
+  const dropped = [...first.dropped];
   progress.stage('checking_quotes', {
-    message: `${questions.length} question${questions.length === 1 ? '' : 's'} verified against the transcript${
-      dropped.length ? `; ${dropped.length} removed because their evidence could not be found` : ''
+    message: `${first.questions.length} question${first.questions.length === 1 ? '' : 's'} have their quote in the transcript${
+      first.dropped.length ? `; ${first.dropped.length} removed because their evidence could not be found` : ''
     }.`,
     percent: 100,
   });
-  return { quiz: { questions, dropped }, provider: result.provider };
+
+  progress.stage('verifying', { message: 'Answering each question independently from its cited passage' });
+  let check = await factCheckQuestions({ questions: first.questions, segments, deps, progress, signal });
+  let questions = check.kept;
+  dropped.push(...check.dropped);
+  const statuses = [check.status];
+  let checker = check.checker;
+
+  // One refill if the independent check left too few questions.
+  if (check.status !== 'unchecked' && questions.length < minQuestions && check.dropped.length) {
+    const missing = questionCount - questions.length;
+    progress.update({ message: `Writing ${missing} replacement question${missing === 1 ? '' : 's'}` });
+    const avoid = `Do not repeat these questions:\n${questions.map((q) => `- ${q.question}`).join('\n') || '(none)'}\nAvoid these problems found in earlier questions:\n${check.dropped
+      .map((d) => `- ${d.reason}`)
+      .join('\n')}`;
+    try {
+      const refill = await writeQuestions({
+        segments,
+        chapters,
+        questionCount: missing,
+        difficulty,
+        extraInstruction: [extraInstruction, avoid].filter(Boolean).join('\n\n'),
+        config,
+        providers,
+        progress,
+        signal,
+        minQuestions: 1,
+        idOffset: 100,
+      });
+      dropped.push(...refill.dropped);
+      const recheck = await factCheckQuestions({ questions: refill.questions, segments, deps, progress, signal });
+      questions = [...questions, ...recheck.kept];
+      dropped.push(...recheck.dropped);
+      statuses.push(recheck.status);
+      checker ??= recheck.checker;
+    } catch (err) {
+      if (signal?.aborted) throw err;
+      progress.notice(`Replacement questions could not be written (${err.message}).`, { level: 'warn' });
+    }
+  }
+
+  const status = statuses.every((s) => s === 'checked') ? 'checked' : statuses.every((s) => s === 'unchecked') ? 'unchecked' : 'partial';
+  const confirmed = questions.filter((q) => q.check === 'confirmed').length;
+  progress.update({
+    percent: 100,
+    message:
+      status === 'unchecked'
+        ? 'Fact-checker unavailable; questions marked as not checked'
+        : `${confirmed} of ${questions.length} answers confirmed independently${check.dropped.length ? `; ${dropped.length} questions removed in total` : ''}`,
+  });
+
+  return {
+    quiz: { questions: renumber(questions), dropped, verification: verificationSummary({ status, checker }) },
+    provider: first.provider,
+  };
 }

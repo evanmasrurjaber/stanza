@@ -17,7 +17,14 @@ import {
   takeawaysRevisionPrompt,
 } from '../prompts/revise.js';
 import { buildChapters } from './chapters.js';
-import { cleanTakeaways } from './overview.js';
+import { cleanCited, cleanTakeaways, factCheckOverviewParts, joinSummary } from './overview.js';
+import { factCheckQuestions, mergeVerification, verificationSummary } from './factcheck.js';
+
+const removalNotes = (v) => [
+  ...v.removed.map((r) => `Removed from the ${r.section}: “${r.text.slice(0, 80)}${r.text.length > 80 ? '…' : ''}” (${r.reason}).`),
+  ...(v.repaired ? [`${v.repaired} sentence${v.repaired === 1 ? ' was' : 's were'} corrected to match the transcript.`] : []),
+  ...(v.note ? [v.note] : []),
+];
 import { generateQuiz, validateQuiz } from './quiz.js';
 import { QUIZ_SYSTEM, quizPrompt } from '../prompts/quiz.js';
 import { LLM_Quiz } from '../schemas/index.js';
@@ -121,15 +128,35 @@ async function reviseTarget(target, ctx) {
   const { overview } = result;
   const common = { deps, progress, signal, system: REVISER_SYSTEM };
 
+  const factDeps = { config: deps.config, providers: deps.providers };
+
   if (target.section === 'summary') {
+    const ids = segments.map((s) => s.id);
     const data = await callLlm({
       ...common,
       task: 'revise_summary',
       user: summaryRevisionPrompt({ segments, overview, instruction }),
       schema: LLM_SummaryRevision,
-      validate: (d) => (d.summary.trim() ? { value: d, errors: [] } : { value: null, errors: ['summary is empty'] }),
+      validate: (d) => {
+        const { kept, errors } = cleanCited(d.summary, ids, 'Summary sentence');
+        return kept.length ? { value: { sentences: kept, themes: d.themes }, errors } : { value: null, errors: [...errors, 'The summary has no sentence citing a valid segment ID.'] };
+      },
     });
-    return { changed: ['summary'], apply: (r) => ({ ...r, overview: { ...r.overview, summary: data.summary.trim(), themes: data.themes.map((t) => t.trim()).filter(Boolean) } }) };
+    const checked = await factCheckOverviewParts({ summarySentences: data.sentences, segments, deps: factDeps, progress, signal });
+    return {
+      changed: ['summary'],
+      notes: removalNotes(checked.verification),
+      apply: (r) => ({
+        ...r,
+        overview: {
+          ...r.overview,
+          summary: joinSummary(checked.summarySentences),
+          summarySentences: checked.summarySentences,
+          themes: data.themes.map((t) => t.trim()).filter(Boolean),
+          verification: mergeVerification(r.overview.verification, checked.verification),
+        },
+      }),
+    };
   }
 
   if (target.section === 'takeaways') {
@@ -143,7 +170,15 @@ async function reviseTarget(target, ctx) {
         return kept.length ? { value: kept, errors } : { value: null, errors: [...errors, 'No takeaway cited a valid segment ID.'] };
       },
     });
-    return { changed: ['takeaways'], apply: (r) => ({ ...r, overview: { ...r.overview, takeaways: data } }) };
+    const checked = await factCheckOverviewParts({ takeaways: data, segments, deps: factDeps, progress, signal });
+    return {
+      changed: ['takeaways'],
+      notes: removalNotes(checked.verification),
+      apply: (r) => ({
+        ...r,
+        overview: { ...r.overview, takeaways: checked.takeaways, verification: mergeVerification(r.overview.verification, checked.verification) },
+      }),
+    };
   }
 
   if (target.section === 'chapters' && target.ids.length) {
@@ -202,11 +237,21 @@ async function reviseTarget(target, ctx) {
       schema: LLM_Quiz,
       validate: (d) => validateQuiz(d, segments, { threshold, minQuestions: 1, maxQuestions: target.ids.length }),
     });
-    const fresh = new Map(target.ids.slice(0, data.questions.length).map((id, i) => [id, { ...data.questions[i], id }]));
+    // Same blind independent check as first-pass questions; only confirmed (or unchecked) ones replace the old ones.
+    const verified = await factCheckQuestions({ questions: data.questions, segments, deps: factDeps, progress, signal });
+    const fresh = new Map(target.ids.slice(0, verified.kept.length).map((id, i) => [id, { ...verified.kept[i], id }]));
+    const notes = fresh.size < target.ids.length ? [`Only ${fresh.size} of ${target.ids.length} questions could be replaced with verified ones; the rest were kept.`] : [];
     return {
       changed: [...fresh.keys()].map((id) => `quiz:${id}`),
-      notes: fresh.size < target.ids.length ? [`Only ${fresh.size} of ${target.ids.length} questions could be replaced with verified ones; the rest were kept.`] : [],
-      apply: (r) => ({ ...r, quiz: { ...r.quiz, questions: r.quiz.questions.map((q) => fresh.get(q.id) ?? q) } }),
+      notes,
+      apply: (r) => ({
+        ...r,
+        quiz: {
+          ...r.quiz,
+          questions: r.quiz.questions.map((q) => fresh.get(q.id) ?? q),
+          verification: mergeVerification(r.quiz.verification, verificationSummary({ status: verified.status, checker: verified.checker })),
+        },
+      }),
     };
   }
 

@@ -41,7 +41,10 @@ export function fakeLlm(name, respond) {
 
 export function overviewDraft(segments) {
   return {
-    summary: 'The hosts discuss many everyday topics and the evidence behind them.',
+    summary: [
+      { text: 'The hosts discuss many everyday topics.', segmentIds: ['S0001'] },
+      { text: 'They describe the evidence behind each one.', segmentIds: ['S0008', 'S9999'] },
+    ],
     themes: ['habits', 'evidence'],
     takeaways: [
       { text: 'Sleep matters.', segmentIds: ['S0001', 'S0002'] },
@@ -79,3 +82,33 @@ export const ndjson = (text) =>
     .split('\n')
     .filter(Boolean)
     .map((l) => JSON.parse(l));
+
+/**
+ * Fake fact-checker. Answers judge tasks the way a correct judge would for our fixtures:
+ *   judge_claims: every claim "supported" unless its text contains a word listed in `reject`
+ *   judge_quiz:   blind answer = the letter whose option text is "Right answer"
+ * Returns undefined for other tasks so callers can chain it.
+ */
+export function fakeJudge({ schemaName, user }, { reject = [], verdict = 'overstated' } = {}) {
+  if (schemaName === 'judge_claims') {
+    const claims = [...user.matchAll(/^([A-Z]+\d+)\. \[cites [^\]]*\] (.*)$/gm)];
+    return {
+      results: claims.map(([, id, text]) => ({
+        id,
+        verdict: reject.some((w) => text.includes(w)) ? verdict : 'supported',
+        reason: reject.some((w) => text.includes(w)) ? 'goes beyond the evidence' : 'stated directly',
+      })),
+    };
+  }
+  if (schemaName === 'judge_quiz') {
+    const blocks = user.split(/\n(?=Q\d+\. )/).filter((b) => /^Q\d+\. /m.test(b));
+    return {
+      results: blocks.map((b) => {
+        const id = /^(Q\d+)\./m.exec(b)[1];
+        const letter = /^\s+([ABCD])\) Right answer$/m.exec(b)?.[1] ?? 'none';
+        return { id, choice: letter, reason: 'from the evidence' };
+      }),
+    };
+  }
+  return undefined;
+}

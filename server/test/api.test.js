@@ -7,7 +7,7 @@ import request from 'supertest';
 import ffmpegPath from 'ffmpeg-static';
 import { createApp } from '../src/app.js';
 import { providerQuotaExhausted, providerUnavailable, providerRateLimited } from '../src/lib/errors.js';
-import { fakeLlm, makeSegments, ndjson, overviewDraft, quizDraft, testConfig } from './helpers.js';
+import { fakeJudge, fakeLlm, makeSegments, ndjson, overviewDraft, quizDraft, testConfig } from './helpers.js';
 
 const segments = makeSegments(60);
 const NDJSON = 'application/x-ndjson';
@@ -19,7 +19,10 @@ function appWith(providers = {}, cfg = {}) {
 
 /** A primary that answers each task with valid drafts. */
 function happyPrimary() {
-  return fakeLlm('Gemini', ({ schemaName, user }) => {
+  return fakeLlm('Gemini', (args) => {
+    const { schemaName, user } = args;
+    const judged = fakeJudge(args);
+    if (judged) return judged;
     if (schemaName === 'overview') return overviewDraft(segments);
     if (schemaName === 'quiz' || schemaName === 'revise_quiz_questions') {
       const n = Number(/exactly (\d+) questions/.exec(user)?.[1] ?? 4);
@@ -27,7 +30,7 @@ function happyPrimary() {
       d.questions.forEach((q) => (q.question = `${q.question} (revised)`));
       return d;
     }
-    if (schemaName === 'revise_summary') return { summary: 'A much shorter summary.', themes: ['habits'] };
+    if (schemaName === 'revise_summary') return { summary: [{ text: 'A much shorter summary.', segmentIds: ['S0001'] }], themes: ['habits'] };
     if (schemaName === 'route') throw new Error('router should use the router provider');
     throw new Error(`unexpected task ${schemaName}`);
   });
@@ -177,8 +180,22 @@ describe('POST /api/generate/*', () => {
     const { body } = await request(app).post('/api/generate/overview').send({ segments, hasTimestamps: true });
     const res = await request(app).post('/api/generate/quiz').set('Accept', NDJSON).send({ segments, chapters: body.overview.chapters, questionCount: 4 });
     const events = ndjson(res.text);
-    expect(events.find((e) => e.stage === 'checking_quotes' && e.type === 'stage').message).toMatch(/4 questions verified/);
-    expect(events.at(-1).data.quiz.questions).toHaveLength(4);
+    expect(events.find((e) => e.stage === 'checking_quotes' && e.type === 'stage').message).toMatch(/4 questions have their quote in the transcript/);
+    expect(events.filter((e) => e.type === 'stage').map((e) => e.stage)).toEqual(['writing_quiz', 'checking_quotes', 'verifying']);
+    expect(events.some((e) => e.stage === 'verifying' && /4 of 4 answers confirmed independently/.test(e.message ?? ''))).toBe(true);
+    const quiz = events.at(-1).data.quiz;
+    expect(quiz.questions).toHaveLength(4);
+    expect(quiz.questions.every((q) => q.check === 'confirmed')).toBe(true);
+    expect(quiz.verification).toMatchObject({ status: 'checked', checker: expect.stringMatching(/Gemini/) });
+  });
+
+  it('overview is fact-checked: summary sentences carry citations and a verification status', async () => {
+    const res = await request(appWith({ primary: happyPrimary() })).post('/api/generate/overview').send({ segments, hasTimestamps: true });
+    const { overview } = res.body;
+    expect(overview.summarySentences.map((s) => s.segmentIds)).toEqual([['S0001'], ['S0008']]);
+    expect(overview.summary).toBe('The hosts discuss many everyday topics. They describe the evidence behind each one.');
+    expect(overview.takeaways.every((t) => t.check === 'supported')).toBe(true);
+    expect(overview.verification).toMatchObject({ status: 'checked', removed: [], repaired: 0 });
   });
 
   it('quiz rejects chapters that do not belong to the transcript', async () => {

@@ -10,8 +10,8 @@ The server is **stateless**: the browser keeps `segments` and `result` and sends
 | 0. Wake server | `GET /api/health` (poll every 3 s until 200) | – |
 | 1a. Paste/upload transcript | `POST /api/transcript` | (instant) |
 | 1b. *or* upload audio | (browser) then `POST /api/transcribe` | preparing (in-browser compression, real %) → uploading (real %) → validating → probing → [splitting, only for large compressed files] → transcribing (per-part progress) → segmenting. `compressing` appears only for uncompressed files the browser couldn't shrink. |
-| 2. Overview | `POST /api/generate/overview` | summarizing (estimated %) |
-| 3. Quiz | `POST /api/generate/quiz` | writing_quiz (estimated %) → checking_quotes |
+| 2. Overview | `POST /api/generate/overview` | summarizing (estimated %) → verifying |
+| 3. Quiz | `POST /api/generate/quiz` | writing_quiz (estimated %) → checking_quotes → verifying |
 | 4. Revisions | `POST /api/revise` | routing → revising |
 
 The UI should show both the overall step ("Step 2 of 3") and the streamed stage label.
@@ -88,13 +88,23 @@ multipart `audio` (mp3/m4a/wav/ogg/webm/flac) → same shape as `/transcript`, p
 ### `POST /api/generate/overview`
 `{ segments, hasTimestamps }` → `{ overview, hasTimestamps, timestampNote, provider, warnings }`
 
-`overview = { summary, themes[], takeaways[{ text, segmentIds[] }], chapters[{ id:"C1", startSegmentId, endSegmentId, title, explanation, start, end }] }`.
+`overview = { summary, summarySentences[{ text, segmentIds[], check }], themes[], takeaways[{ text, segmentIds[], check }], chapters[{ id:"C1", startSegmentId, endSegmentId, title, explanation, start, end }], verification }`.
+
+`summary` is the sentences joined, kept for compatibility. `check` is `"supported"` or `"unchecked"`.
+
+`verification = { status: "checked"|"partial"|"unchecked", checker, removed[{ section, text, reason }], repaired, note }`. An independent model judged every summary sentence and takeaway against the paragraphs it cites. Flagged items were rewritten once and re-judged, then removed if they still failed. `unchecked` means the checker was unavailable; the content is shown but must be labelled as not fact-checked.
 `start`/`end` are seconds computed from segment data. They are `null` when the source had no timestamps, and `timestampNote` explains why.
 
 ### `POST /api/generate/quiz`
 `{ segments, chapters, questionCount? (3–12, default 6) }` → `{ quiz: { questions[], dropped[] }, provider }`
 
-`question = { id:"Q1", question, options[4], answerIndex, explanation, quote, segmentIds[], difficulty }`. Every `quote` has been verified against the transcript. `dropped` lists the questions removed because their evidence could not be found.
+`question = { id:"Q1", question, options[4], answerIndex, explanation, quote, segmentIds[], difficulty, check }`.
+
+Questions pass two checks:
+1. Code verifies every `quote` against the transcript.
+2. An independent model answers each question blind (without the key) from its cited passage. `check: "confirmed"` means it reached the same answer.
+
+`dropped` lists the questions removed by either check, with reasons. `quiz.verification` has the same shape as above.
 
 ### `POST /api/revise`
 `{ request: string } | { preset }`, plus `result: { overview, quiz|null, hasTimestamps }` and `segments`.

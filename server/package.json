@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "smoke": "node --env-file-if-exists=../.env scripts/smoke-providers.js",
-    "eval:router": "node --env-file-if-exists=../.env scripts/eval-router.js"
+    "eval:router": "node --env-file-if-exists=../.env scripts/eval-router.js",
+    "eval:factcheck": "node --env-file-if-exists=../.env scripts/eval-factcheck.js"
   },
   "dependencies": {
     "@google/genai": "^2.28.0",
