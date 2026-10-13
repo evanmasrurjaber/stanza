@@ -181,7 +181,7 @@ export function Intake({ draft, setDraft, limits, providers, serverStatus, onSub
       </div>
 
       <p className="colophon">
-        Timecodes such as [12:34], or SRT/VTT files, give chapters real times; plain text gets chapters without times. Upload only content you have the rights to. Text is processed by
+        Timecodes such as [12:34], or SRT/VTT files, give chapters real times; plain text gets chapters without times. Upload only content you have the rights to. Audio and text are processed by
         Google Gemini and Groq, and Gemini’s free tier may use it to improve Google products. Nothing is stored on our server.
       </p>
     </form>
