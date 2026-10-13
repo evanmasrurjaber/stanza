@@ -15,6 +15,7 @@ const EnvSchema = z.object({
   GROQ_MAIN_MODEL: z.string().default('openai/gpt-oss-120b'),
   GROQ_SMALL_MODEL: z.string().default('openai/gpt-oss-20b'),
   GROQ_WHISPER_MODEL: z.string().default('whisper-large-v3-turbo'),
+  GEMINI_TRANSCRIBE_MODEL: z.string().default('gemini-3.5-transcribe'),
 
   LLM_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
   MAX_TRANSCRIPT_CHARS: z.coerce.number().int().positive().default(200_000),
@@ -47,7 +48,7 @@ export function loadConfig(env = process.env) {
   return Object.freeze({
     port: c.PORT,
     env: c.NODE_ENV,
-    gemini: { apiKey: c.GEMINI_API_KEY, model: c.GEMINI_MODEL },
+    gemini: { apiKey: c.GEMINI_API_KEY, model: c.GEMINI_MODEL, transcribeModel: c.GEMINI_TRANSCRIBE_MODEL },
     groq: {
       apiKey: c.GROQ_API_KEY,
       mainModel: c.GROQ_MAIN_MODEL,

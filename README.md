@@ -11,7 +11,7 @@ Turn a podcast transcript or recording into an overview, navigable chapters and 
 
 1. **Input:** paste a transcript, upload `.txt/.srt/.vtt`, or upload audio (mp3/m4a/wav/ogg/webm/flac, up to 200 MB and 2 hours).
 2. **Overview:** summary, themes and key takeaways, each takeaway citing transcript segments.
-3. **Chapters:** the model picks where topics change and code builds the chapters. Times come only from real timestamps (Whisper, SRT/VTT, or `[mm:ss]` timecodes). Without them, chapters are shown without times instead of with guessed ones.
+3. **Chapters:** the model picks where topics change and code builds the chapters. Times come only from real timestamps (the speech model's own word/segment times, SRT/VTT, or `[mm:ss]` timecodes). Without them, chapters are shown without times instead of with guessed ones.
 4. **Quiz:** multiple-choice questions built from extracted facts. Each supporting quote is checked against the transcript in code, and unverifiable questions are dropped.
 5. **Revision:** free-text requests ("make Q2 harder", "shorter summary") go through a small router model that revises only the targeted section, asks a clarifying question, or rejects out-of-scope requests. Preset buttons skip the router.
 6. **Progress and errors:** long steps stream live progress (stage, percent, ETA, retry and fallback notices). Every error says whether the cause was the input, a rate limit, an AI provider, or the server. See [docs/api.md](docs/api.md).
@@ -21,7 +21,7 @@ Turn a podcast transcript or recording into an overview, navigable chapters and 
 ```
 Browser (React, Vercel) ──HTTPS + NDJSON progress──► Express API (Render)
                                                        │
-  audio ─► magic-byte check ─► ffprobe (≤ 2 h) ─► ffmpeg 16 kHz mono Opus ─► Groq Whisper ─┐
+  audio ─► (browser: Opus compress) ─► magic-byte check ─► ffprobe (≤ 2 h) ─► pass / stream-copy split ─► Groq Whisper (fallback: Gemini 3.5 Transcribe) ─┐
   text  ─► SRT/VTT/timecode/plain parser ──────────────────────────────────────────────────┤
                                                                                              ▼
                                                     numbered segments S0001… (+ real times)

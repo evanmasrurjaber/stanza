@@ -1,5 +1,6 @@
 import { createGeminiProvider } from './gemini.js';
 import { createGroqChatProvider, createGroqWhisperProvider } from './groq.js';
+import { createGeminiTranscribeProvider } from './geminiTranscribe.js';
 
 // Groq's free tier allows ~8K tokens/min for gpt-oss-120b; leave room for the output.
 export const GROQ_FALLBACK_MAX_INPUT_TOKENS = 5000;
@@ -11,6 +12,7 @@ export const GROQ_FALLBACK_MAX_INPUT_TOKENS = 5000;
  *   fallback – used when primary fails (Groq gpt-oss-120b, small inputs only)
  *   router   – revision router (Groq gpt-oss-20b)
  *   whisper  – speech-to-text (Groq Whisper)
+ *   transcribeFallback – speech-to-text when Whisper fails (Gemini 3.5 Transcribe)
  */
 export function createProviders(config) {
   const { gemini, groq, llmTimeoutMs } = config;
@@ -31,5 +33,6 @@ export function createProviders(config) {
     whisper: groq.apiKey
       ? createGroqWhisperProvider({ apiKey: groq.apiKey, model: groq.whisperModel, timeoutMs: 10 * 60_000 })
       : null,
+    transcribeFallback: gemini.apiKey ? createGeminiTranscribeProvider({ apiKey: gemini.apiKey, model: gemini.transcribeModel }) : null,
   };
 }

@@ -25,3 +25,5 @@ services:
         value: openai/gpt-oss-20b
       - key: GROQ_WHISPER_MODEL
         value: whisper-large-v3-turbo
+      - key: GEMINI_TRANSCRIBE_MODEL
+        value: gemini-3.5-transcribe

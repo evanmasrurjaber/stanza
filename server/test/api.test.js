@@ -311,6 +311,94 @@ describe('POST /api/transcribe', () => {
     fs.rmSync(mp3, { force: true });
   }, 60_000);
 
+  describe('transcription fallback', () => {
+    let mp3;
+    let size;
+    beforeAll(() => {
+      mp3 = path.join(os.tmpdir(), `stanza-fallback-${process.pid}.mp3`);
+      spawnSync(ffmpegPath, ['-y', '-f', 'lavfi', '-i', 'anoisesrc=d=60:c=pink:a=0.1', '-ac', '1', '-c:a', 'libmp3lame', '-b:a', '64k', mp3]);
+      size = fs.statSync(mp3).size;
+    });
+
+    const segmentsFor = (n) => Array.from({ length: n }, (_, i) => ({ text: segments[i % segments.length].text, start: i * 2, end: i * 2 + 2 }));
+    const splitConfig = () => {
+      const cfg = testConfig();
+      return { ...cfg, limits: { ...cfg.limits, compressedAudioBytes: Math.ceil(size / 2.5), copyChunkMinSeconds: 5 } };
+    };
+
+    it('switches to Gemini Transcribe mid-file and keeps the parts Whisper already did', async () => {
+      let whisperCalls = 0;
+      const whisper = {
+        name: 'Groq Whisper',
+        model: 'test',
+        async transcribe() {
+          whisperCalls++;
+          if (whisperCalls === 1) return { language: 'en', segments: segmentsFor(8) };
+          throw providerQuotaExhausted('Groq Whisper', 'free quota resets in about 40 min');
+        },
+      };
+      const geminiCalls = [];
+      const gemini = {
+        name: 'Gemini Transcribe',
+        model: 'test',
+        maxChunkSeconds: 25,
+        async transcribe(file) {
+          geminiCalls.push(file);
+          return { language: null, segments: segmentsFor(10) };
+        },
+      };
+      const app = createApp({ config: splitConfig(), providers: { ...noProviders, whisper, transcribeFallback: gemini } });
+      const events = ndjson((await request(app).post('/api/transcribe').set('Accept', NDJSON).attach('audio', mp3, 'ep.mp3')).text);
+
+      const notice = events.find((e) => e.type === 'notice' && /backup transcription service/.test(e.message));
+      expect(notice).toMatchObject({ level: 'warn', provider: 'Groq Whisper' });
+      expect(notice.message).toMatch(/quota.*Switching to the backup transcription service \(Gemini Transcribe\) from 0:\d\d; the part already transcribed is kept/);
+      const result = events.at(-1);
+      expect(result.type).toBe('result');
+      expect(result.data.provider).toBe('Groq Whisper, then Gemini Transcribe');
+      expect(whisperCalls).toBe(2);
+      expect(geminiCalls.length).toBeGreaterThanOrEqual(2); // re-cut into parts within its duration cap
+      const starts = result.data.segments.map((s) => s.start);
+      expect(starts.every((t, i) => i === 0 || t >= starts[i - 1])).toBe(true);
+      expect(Math.max(...starts)).toBeGreaterThan(30);
+    }, 60_000);
+
+    it('reports every transcription service when all fail', async () => {
+      const whisper = {
+        name: 'Groq Whisper',
+        model: 't',
+        transcribe: async () => {
+          throw providerQuotaExhausted('Groq Whisper');
+        },
+      };
+      const gemini = {
+        name: 'Gemini Transcribe',
+        model: 't',
+        maxChunkSeconds: 1800,
+        transcribe: async () => {
+          throw providerQuotaExhausted('Gemini Transcribe');
+        },
+      };
+      const app = createApp({ config: testConfig(), providers: { ...noProviders, whisper, transcribeFallback: gemini } });
+      const res = await request(app).post('/api/transcribe').attach('audio', wav, 'tone.wav');
+      expect(res.status).toBe(503);
+      expect(res.body.error).toMatchObject({
+        code: 'ALL_PROVIDERS_FAILED',
+        stage: 'transcribing',
+        retryable: false,
+        attempts: [{ provider: 'Groq Whisper' }, { provider: 'Gemini Transcribe' }],
+      });
+    }, 30_000);
+
+    it('works with only Gemini Transcribe configured', async () => {
+      const gemini = { name: 'Gemini Transcribe', model: 't', maxChunkSeconds: 1800, transcribe: async () => ({ language: null, segments: segmentsFor(4) }) };
+      const app = createApp({ config: testConfig(), providers: { ...noProviders, transcribeFallback: gemini } });
+      const res = await request(app).post('/api/transcribe').attach('audio', wav, 'tone.wav');
+      expect(res.status).toBe(200);
+      expect(res.body.provider).toBe('Gemini Transcribe');
+    }, 30_000);
+  });
+
   it('rejects a text file renamed to .mp3 by its content', async () => {
     const res = await request(appWith({ whisper })).post('/api/transcribe').attach('audio', Buffer.from('just some text, not audio'), 'fake.mp3');
     expect(res.status).toBe(415);

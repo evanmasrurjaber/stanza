@@ -53,24 +53,25 @@ export function createGeminiProvider({ apiKey, model }) {
   };
 }
 
-export function mapGeminiError(err) {
+/** Map a Gemini SDK error to an AppError naming `provider` (e.g. "Gemini" or "Gemini Transcribe"). */
+export function mapGeminiError(err, provider = GEMINI) {
   const status = err instanceof ApiError ? err.status : err?.status;
   const msg = String(err?.message ?? '');
   if (status === 429) {
     // Quota errors carry the violated quota id, e.g. "GenerateRequestsPerDayPerProjectPerModel-FreeTier".
-    if (/PerDay/i.test(msg)) return providerQuotaExhausted(GEMINI, 'daily request limit reached', err);
+    if (/PerDay/i.test(msg)) return providerQuotaExhausted(provider, 'daily request limit reached', err);
     if (/RESOURCE_EXHAUSTED/i.test(msg) && !/PerMinute/i.test(msg) && /quota/i.test(msg) && !/retryDelay/i.test(msg)) {
-      return providerQuotaExhausted(GEMINI, 'quota exceeded', err);
+      return providerQuotaExhausted(provider, 'quota exceeded', err);
     }
     const delay = /"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/.exec(msg);
-    return providerRateLimited(GEMINI, delay ? Math.ceil(Number(delay[1]) * 1000) : null, err);
+    return providerRateLimited(provider, delay ? Math.ceil(Number(delay[1]) * 1000) : null, err);
   }
   if (status === 401 || status === 403) {
-    if (/location|region|country/i.test(msg)) return providerRejected(GEMINI, 'the API is not available in the server region', err);
-    return providerAuth(GEMINI, err);
+    if (/location|region|country/i.test(msg)) return providerRejected(provider, 'the API is not available in the server region', err);
+    return providerAuth(provider, err);
   }
-  if (status === 400) return providerRejected(GEMINI, 'invalid request', err);
-  if (status === 413) return providerRejected(GEMINI, 'the input is too large', err);
-  if (status >= 500) return providerUnavailable(GEMINI, `HTTP ${status}`, err);
-  return providerUnavailable(GEMINI, 'network error', err);
+  if (status === 400) return providerRejected(provider, 'invalid request', err);
+  if (status === 413) return providerRejected(provider, 'the input is too large', err);
+  if (status >= 500) return providerUnavailable(provider, `HTTP ${status}`, err);
+  return providerUnavailable(provider, 'network error', err);
 }

@@ -47,7 +47,7 @@ Every error, whether a JSON body `{ "error": … }` or a streamed `{"type":"erro
   "code": "ALL_PROVIDERS_FAILED",
   "category": "provider",          // input | limit | provider | server
   "message": "All AI providers failed. Gemini: Gemini's free usage quota is used up (daily request limit reached). Please try again later. Groq: Input (~52,000 tokens) exceeds Groq's free-tier budget (~5,000 tokens).",
-  "provider": null,                // "Gemini" | "Groq" | "Groq Whisper" | null
+  "provider": null,                // "Gemini" | "Groq" | "Groq Whisper" | "Gemini Transcribe" | null
   "stage": "summarizing",          // where it happened
   "retryable": false,
   "retryAfterSeconds": null,

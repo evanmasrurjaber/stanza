@@ -12,7 +12,7 @@ export function healthRouter({ config, providers }) {
         primary: Boolean(providers.primary),
         fallback: Boolean(providers.fallback),
         router: Boolean(providers.router),
-        transcription: Boolean(providers.whisper),
+        transcription: Boolean(providers.whisper || providers.transcribeFallback),
       },
     });
   });
