@@ -14,12 +14,12 @@ export const GEMINI = 'Gemini';
  * Gemini adapter. Exposes the provider interface used by llm/structured.js:
  *   generateJson({ system, user, jsonSchema, signal, temperature }) -> string
  */
-export function createGeminiProvider({ apiKey, model }) {
+export function createGeminiProvider({ apiKey, model, label = GEMINI }) {
   // The SDK retries 5x by default; we own retry/backoff/fallback policy, so disable it.
   const ai = new GoogleGenAI({ apiKey, httpOptions: { retryOptions: { attempts: 1 } } });
 
   return {
-    name: GEMINI,
+    name: label,
     model,
     maxInputTokens: null, // ~1M context; effectively unlimited for our input caps
     async generateJson({ system, user, jsonSchema, signal, temperature = 0.3 }) {
@@ -38,15 +38,15 @@ export function createGeminiProvider({ apiKey, model }) {
         });
       } catch (err) {
         if (signal?.aborted) throw err; // withTimeout converts this to timeout / client-abort
-        throw mapGeminiError(err);
+        throw mapGeminiError(err, label);
       }
       const text = res.text;
       if (!text) {
         const reason = res.candidates?.[0]?.finishReason ?? res.promptFeedback?.blockReason ?? 'unknown';
         if (/SAFETY|BLOCK|PROHIBITED/i.test(reason)) {
-          throw providerRejected(GEMINI, `its safety filter blocked this content (${reason})`);
+          throw providerRejected(label, `its safety filter blocked this content (${reason})`);
         }
-        throw modelOutputInvalid(GEMINI, `${GEMINI} returned an empty answer (reason: ${reason}).`);
+        throw modelOutputInvalid(label, `${label} returned an empty answer (reason: ${reason}).`);
       }
       return text;
     },

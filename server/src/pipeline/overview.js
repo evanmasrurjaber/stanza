@@ -1,6 +1,7 @@
 import { generateStructured } from '../llm/structured.js';
 import { LLM_Overview } from '../schemas/index.js';
 import { OVERVIEW_SYSTEM, overviewPrompt } from '../prompts/overview.js';
+import { fitTranscriptPrompt } from '../prompts/common.js';
 import { buildChapters, targetChapterCount } from './chapters.js';
 import { transcriptStats } from '../transcript/segmenter.js';
 import { estimateLlmSeconds, startEstimate } from '../lib/progress.js';
@@ -89,10 +90,11 @@ export async function generateOverview({ segments, hasTimestamps, config, provid
       user,
       schema: LLM_Overview,
       validate: (d) => validateOverview(d, segments, { hasTimestamps }),
-      providers: [providers.primary, providers.fallback],
+      providers: [providers.primary, providers.secondary, providers.fallback],
       timeoutMs: config.llmTimeoutMs,
       progress,
       signal,
+      shrink: (maxTokens) => fitTranscriptPrompt(segments, (segs) => overviewPrompt({ segments: segs, targetChapters }), maxTokens),
     });
   } finally {
     stop();

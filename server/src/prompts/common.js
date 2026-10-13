@@ -19,3 +19,32 @@ export function formatTranscript(segments) {
 
 /** Wrap user-provided text so the model treats it as a quoted request, not system instructions. */
 export const quoteUserText = (text) => `<user_request>\n${String(text).replace(/<\/?user_request>/gi, '')}\n</user_request>`;
+
+/**
+ * Fit a transcript prompt into a small token budget (the Groq backup's free tier) by trimming every
+ * paragraph to the same share of its words. Paragraph IDs, order and times are kept, so citations and
+ * chapter starts stay valid, and every remaining word is still verbatim (quotes still verify against
+ * the full transcript). Returns null if even a few words per paragraph do not fit.
+ */
+export function fitTranscriptPrompt(segments, build, maxTokens) {
+  const tokens = (s) => Math.ceil(s.length / 4);
+  const words = segments.map((s) => s.text.split(/\s+/));
+  const make = (share) =>
+    build(segments.map((s, i) => (share >= 1 ? s : { ...s, text: words[i].slice(0, Math.max(6, Math.ceil(words[i].length * share))).join(' ') })));
+  const full = make(1);
+  if (tokens(full) <= maxTokens) return full;
+  let lo = 0;
+  let hi = 1;
+  let best = null;
+  for (let step = 0; step < 12; step++) {
+    const mid = (lo + hi) / 2;
+    const prompt = make(mid);
+    if (tokens(prompt) <= maxTokens) {
+      best = prompt;
+      lo = mid;
+    } else {
+      hi = mid;
+    }
+  }
+  return best;
+}

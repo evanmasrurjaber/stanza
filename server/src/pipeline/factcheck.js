@@ -67,8 +67,8 @@ export function batchByEvidence(items, segments, budget = EVIDENCE_TOKEN_BUDGET)
   return batches.map((b) => ({ items: b.items, evidence: [...b.evidence].sort((a, z) => a - z).map((i) => segments[i]) }));
 }
 
-const judgeProviders = (deps) => [deps.providers.router, deps.providers.primary];
-const writerProviders = (deps) => [deps.providers.primary, deps.providers.fallback];
+const judgeProviders = (deps) => [deps.providers.router, deps.providers.primary, deps.providers.secondary];
+const writerProviders = (deps) => [deps.providers.primary, deps.providers.secondary, deps.providers.fallback];
 
 const requireAllIds = (ids) => (d) => {
   const got = new Set(d.results.map((r) => r.id));

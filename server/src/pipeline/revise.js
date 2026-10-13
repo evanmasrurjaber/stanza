@@ -111,7 +111,7 @@ async function callLlm({ task, system, user, schema, validate, deps, progress, s
       user,
       schema,
       validate,
-      providers: providers ?? [deps.providers.primary, deps.providers.fallback],
+      providers: providers ?? [deps.providers.primary, deps.providers.secondary, deps.providers.fallback],
       timeoutMs: deps.config.llmTimeoutMs,
       progress,
       signal,
@@ -294,7 +294,7 @@ export async function reviseResult({ request, preset, result, segments, deps, pr
       deps,
       progress,
       signal,
-      providers: [deps.providers.router, deps.providers.primary],
+      providers: [deps.providers.router, deps.providers.primary, deps.providers.secondary],
     });
     route = validateRoute(raw, result, request);
   }

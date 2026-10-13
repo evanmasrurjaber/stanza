@@ -1,6 +1,7 @@
 import { generateStructured } from '../llm/structured.js';
 import { LLM_Quiz } from '../schemas/index.js';
 import { QUIZ_SYSTEM, quizPrompt } from '../prompts/quiz.js';
+import { fitTranscriptPrompt } from '../prompts/common.js';
 import { checkQuote } from './quoteCheck.js';
 import { estimateLlmSeconds, startEstimate } from '../lib/progress.js';
 import { factCheckQuestions, verificationSummary } from './factcheck.js';
@@ -95,10 +96,12 @@ async function writeQuestions({ segments, chapters, questionCount, difficulty, e
       user,
       schema: LLM_Quiz,
       validate: (d) => validateQuiz(d, segments, { threshold: config.quoteMatchThreshold, minQuestions, maxQuestions: questionCount, idOffset }),
-      providers: [providers.primary, providers.fallback],
+      providers: [providers.primary, providers.secondary, providers.fallback],
       timeoutMs: config.llmTimeoutMs,
       progress,
       signal,
+      shrink: (maxTokens) =>
+        fitTranscriptPrompt(segments, (segs) => quizPrompt({ segments: segs, chapters, questionCount, difficulty, extraInstruction }), maxTokens),
     });
     return { ...result.data, provider: result.provider };
   } finally {
@@ -119,7 +122,8 @@ export async function generateQuiz({ segments, chapters, questionCount, difficul
   const deps = { config, providers };
   const minQuestions = Math.min(3, questionCount);
   progress.stage('writing_quiz', { etaSeconds: estimateLlmSeconds(segments.reduce((n, s) => n + s.text.length, 0)) + 5 });
-  const first = await writeQuestions({ segments, chapters, questionCount, difficulty, extraInstruction, config, providers, progress, signal, minQuestions });
+  // Accept any questions whose quotes verified (a repair call happens only if none did); the refill below tops up the rest.
+  const first = await writeQuestions({ segments, chapters, questionCount, difficulty, extraInstruction, config, providers, progress, signal, minQuestions: 1 });
   const dropped = [...first.dropped];
   progress.stage('checking_quotes', {
     message: `${first.questions.length} question${first.questions.length === 1 ? '' : 's'} have their quote in the transcript${
@@ -135,13 +139,13 @@ export async function generateQuiz({ segments, chapters, questionCount, difficul
   const statuses = [check.status];
   let checker = check.checker;
 
-  // One refill if the independent check left too few questions.
-  if (check.status !== 'unchecked' && questions.length < minQuestions && check.dropped.length) {
+  // One refill if the quote check or the independent check left too few questions.
+  if (questions.length < minQuestions && (check.dropped.length || first.dropped.length)) {
     const missing = questionCount - questions.length;
     progress.update({ message: `Writing ${missing} replacement question${missing === 1 ? '' : 's'}` });
-    const avoid = `Do not repeat these questions:\n${questions.map((q) => `- ${q.question}`).join('\n') || '(none)'}\nAvoid these problems found in earlier questions:\n${check.dropped
+    const avoid = `Do not repeat these questions:\n${questions.map((q) => `- ${q.question}`).join('\n') || '(none)'}\nAvoid these problems found in earlier questions:\n${[...first.dropped, ...check.dropped]
       .map((d) => `- ${d.reason}`)
-      .join('\n')}`;
+      .join('\n')}\nCopy every quote word for word from the transcript.`;
     try {
       const refill = await writeQuestions({
         segments,

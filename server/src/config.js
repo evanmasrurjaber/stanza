@@ -11,6 +11,8 @@ const EnvSchema = z.object({
 
   GEMINI_API_KEY: z.string().default(''),
   GEMINI_MODEL: z.string().default('gemini-3-flash-preview'),
+  // Second Gemini model tried when the first fails (503 overload often hits one model, not all). Empty = off.
+  GEMINI_FALLBACK_MODEL: z.string().default('gemini-3.1-flash-lite'),
   GROQ_API_KEY: z.string().default(''),
   GROQ_MAIN_MODEL: z.string().default('openai/gpt-oss-120b'),
   GROQ_SMALL_MODEL: z.string().default('openai/gpt-oss-20b'),
@@ -48,7 +50,7 @@ export function loadConfig(env = process.env) {
   return Object.freeze({
     port: c.PORT,
     env: c.NODE_ENV,
-    gemini: { apiKey: c.GEMINI_API_KEY, model: c.GEMINI_MODEL, transcribeModel: c.GEMINI_TRANSCRIBE_MODEL },
+    gemini: { apiKey: c.GEMINI_API_KEY, model: c.GEMINI_MODEL, fallbackModel: c.GEMINI_FALLBACK_MODEL, transcribeModel: c.GEMINI_TRANSCRIBE_MODEL },
     groq: {
       apiKey: c.GROQ_API_KEY,
       mainModel: c.GROQ_MAIN_MODEL,

@@ -36,6 +36,9 @@ export async function generateStructured({
   progress = createProgress(),
   signal,
   backoff = {},
+  // Optional: (maxUserTokens) => a shorter user prompt for providers with a small input budget
+  // (Groq's free tier). Returns null when it cannot fit. Without it, such providers are skipped.
+  shrink = null,
 }) {
   const chain = providers.filter(Boolean);
   if (!chain.length) throw noProviderConfigured(task);
@@ -47,24 +50,34 @@ export async function generateStructured({
   for (let i = 0; i < chain.length; i++) {
     const provider = chain[i];
     const next = chain[i + 1];
+    let prompt = user;
     if (provider.maxInputTokens && tokens > provider.maxInputTokens) {
-      attempts.push({
+      const shorter = shrink ? shrink(provider.maxInputTokens - estimateTokens(system)) : null;
+      if (!shorter || estimateTokens(system, shorter) > provider.maxInputTokens) {
+        attempts.push({
+          provider: provider.name,
+          code: 'SKIPPED_INPUT_TOO_LARGE',
+          message: `Input (~${tokens.toLocaleString('en-US')} tokens) exceeds ${provider.name}'s free-tier budget (~${provider.maxInputTokens.toLocaleString('en-US')} tokens).`,
+        });
+        logger.warn('provider skipped: input too large', { task, provider: provider.name, tokens });
+        continue;
+      }
+      prompt = shorter;
+      logger.warn('provider given a shortened transcript', { task, provider: provider.name, tokens, shortenedTokens: estimateTokens(system, shorter) });
+      progress.notice(`${provider.name} has a small free input limit, so it is working from a shortened transcript; the result may be less complete.`, {
+        level: 'warn',
         provider: provider.name,
-        code: 'SKIPPED_INPUT_TOO_LARGE',
-        message: `Input (~${tokens.toLocaleString('en-US')} tokens) exceeds ${provider.name}'s free-tier budget (~${provider.maxInputTokens.toLocaleString('en-US')} tokens).`,
       });
-      logger.warn('provider skipped: input too large', { task, provider: provider.name, tokens });
-      continue;
     }
     try {
-      const out = await runWithRepair({ task, provider, system, user, schema, jsonSchema, validate, timeoutMs, temperature, backoff, progress, signal });
+      const out = await runWithRepair({ task, provider, system, user: prompt, schema, jsonSchema, validate, timeoutMs, temperature, backoff, progress, signal });
       return { ...out, provider: provider.name, model: provider.model };
     } catch (err) {
       if (!canFallBack(err)) throw err;
       attempts.push({ provider: provider.name, code: err.code, message: err.message });
       logger.warn('provider failed', { task, provider: provider.name, code: err.code, message: err.message });
       if (next) {
-        const nextFits = !next.maxInputTokens || tokens <= next.maxInputTokens;
+        const nextFits = !next.maxInputTokens || tokens <= next.maxInputTokens || Boolean(shrink);
         progress.notice(
           nextFits
             ? `${err.message} Switching to the backup provider (${next.name})…`
