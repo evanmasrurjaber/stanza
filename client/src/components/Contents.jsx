@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Check, Copy, Download, Pause, Play } from 'lucide-react';
+import { Check, Copy, Download, FileDown, Pause, Play } from 'lucide-react';
 import { clock } from '../lib/format.js';
 import { download, slug, toMarkdown } from '../lib/markdown.js';
+import { downloadPdf } from '../lib/pdf.js';
 
 /** Small custom player for the uploaded file (object URL, never sent anywhere else). */
 export function Player({ audioRef, src, time, duration, playing }) {
@@ -38,6 +39,7 @@ export function Player({ audioRef, src, time, duration, playing }) {
 
 function Export({ edition }) {
   const [copied, setCopied] = useState(false);
+  const [pdfState, setPdfState] = useState('idle'); // idle | working | failed
   useEffect(() => {
     if (!copied) return;
     const t = setTimeout(() => setCopied(false), 2000);
@@ -72,16 +74,26 @@ function Export({ edition }) {
       <button
         type="button"
         className="rail__action"
-        onClick={() =>
-          download(
-            `${name}.json`,
-            JSON.stringify({ title: edition.title, generatedAt: new Date().toISOString(), hasTimestamps: edition.hasTimestamps, ...result, segments: edition.segments }, null, 2),
-            'application/json',
-          )
-        }
+        disabled={pdfState === 'working'}
+        onClick={async () => {
+          setPdfState('working');
+          try {
+            await downloadPdf({ title: edition.title, overview: edition.overview, quiz: edition.quiz, segments: edition.segments });
+            setPdfState('idle');
+          } catch (err) {
+            console.error(err);
+            setPdfState('failed');
+          }
+        }}
       >
-        <Download size={16} strokeWidth={2} aria-hidden="true" /> Download .json
+        <FileDown size={16} strokeWidth={2} aria-hidden="true" />
+        <span aria-live="polite">{pdfState === 'working' ? 'Preparing PDF…' : 'Download PDF'}</span>
       </button>
+      {pdfState === 'failed' && (
+        <p className="rail__fine" role="alert">
+          The PDF couldn't be created in this browser. Download .md instead.
+        </p>
+      )}
       {edition.quizStatus === 'working' && <p className="rail__fine">The quiz is still being set; export again once it's ready to include it.</p>}
     </div>
   );

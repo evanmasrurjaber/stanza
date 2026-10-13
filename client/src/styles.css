@@ -983,6 +983,27 @@ textarea {
   }
 }
 
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 2rem;
+  margin-left: auto;
+  padding: 0.25rem 0.625rem;
+  border: 1.5px solid var(--ink);
+  background: var(--paper);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background-color 0.15s var(--ease-out);
+}
+.copy-btn:hover {
+  background: var(--yellow-wash);
+}
+.section__head .factcheck + .copy-btn,
+.section__head .revised + .copy-btn {
+  margin-left: auto;
+}
 .factcheck {
   display: inline-flex;
   align-items: center;

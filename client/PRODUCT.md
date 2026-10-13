@@ -34,7 +34,7 @@ Grounding is the product. Every chapter time comes from a real timestamp (Whispe
 - Long steps (transcription, generation) take seconds to minutes. The backend streams stage-by-stage progress, percent and ETA where known, plus notices about retries and provider fallback.
 - The backend runs on a Render free instance that sleeps when idle and takes about a minute to wake. The UI must make this visible, not mysterious.
 - Free AI tiers (Gemini, Groq) can hit rate limits or daily quotas. Errors arrive categorised as input, limit, provider or server, with the provider named. The user must always know what broke and whether retrying helps.
-- Results live only in the browser. The user copies or downloads them (Markdown or JSON); nothing is stored on the server.
+- Results live only in the browser. The user copies sections as plain text, or exports the edition as Markdown or PDF; nothing is stored on the server.
 - API contract: `../docs/api.md`.
 
 ## Capabilities and Constraints

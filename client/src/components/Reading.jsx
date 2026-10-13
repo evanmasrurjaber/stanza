@@ -1,6 +1,7 @@
-import { createContext, useContext } from 'react';
-import { Play, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { createContext, useContext, useEffect, useState } from 'react';
+import { Check, Copy, Play, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { clock, paraNumber, plural } from '../lib/format.js';
+import { chaptersText, copyText, summaryText, takeawaysText } from '../lib/plainText.js';
 
 /** { segById, cite(id), highlight: { id, n }, seek(seconds) | null } */
 export const EditionCtx = createContext(null);
@@ -67,6 +68,27 @@ export function Removed({ items, noun }) {
   );
 }
 
+/** Copies a section as clean text (no citations). */
+function CopyButton({ getText, label }) {
+  const [state, setState] = useState('idle'); // idle | copied | failed
+  useEffect(() => {
+    if (state === 'idle') return;
+    const t = setTimeout(() => setState('idle'), 2000);
+    return () => clearTimeout(t);
+  }, [state]);
+  return (
+    <button
+      type="button"
+      className="copy-btn"
+      onClick={async () => setState((await copyText(getText())) ? 'copied' : 'failed')}
+      aria-label={state === 'copied' ? `${label} copied` : `Copy ${label} as plain text`}
+    >
+      {state === 'copied' ? <Check size={14} strokeWidth={2.25} aria-hidden="true" /> : <Copy size={14} strokeWidth={2} aria-hidden="true" />}
+      <span aria-live="polite">{state === 'copied' ? 'Copied' : state === 'failed' ? 'Copy failed' : 'Copy'}</span>
+    </button>
+  );
+}
+
 function SectionHead({ id, children, revisedAt, aside }) {
   return (
     <div className="section__head">
@@ -84,7 +106,16 @@ export function Overview({ overview, revised }) {
   const sentences = overview.summarySentences;
   return (
     <section className="section" aria-labelledby="h-summary" id="sec-summary" data-spy="summary">
-      <SectionHead id="h-summary" revisedAt={revised.summary} aside={<FactCheck verification={v} />}>
+      <SectionHead
+        id="h-summary"
+        revisedAt={revised.summary}
+        aside={
+          <>
+            <FactCheck verification={v} />
+            <CopyButton label="summary" getText={() => summaryText(overview)} />
+          </>
+        }
+      >
         Summary
       </SectionHead>
       <div className="prose" key={revised.summary ?? 0}>
@@ -127,7 +158,16 @@ export function Overview({ overview, revised }) {
 export function Takeaways({ takeaways, revised, verification }) {
   return (
     <section className="section" aria-labelledby="h-takeaways" id="sec-takeaways" data-spy="takeaways">
-      <SectionHead id="h-takeaways" revisedAt={revised.takeaways} aside={<FactCheck verification={verification} what="Each takeaway" />}>
+      <SectionHead
+        id="h-takeaways"
+        revisedAt={revised.takeaways}
+        aside={
+          <>
+            <FactCheck verification={verification} what="Each takeaway" />
+            <CopyButton label="key takeaways" getText={() => takeawaysText(takeaways)} />
+          </>
+        }
+      >
         Key takeaways
       </SectionHead>
       <ol className="takeaways">
@@ -156,7 +196,7 @@ export function Chapters({ chapters, revised, timestampNote, activeChapterId }) 
   const { seek } = useEditionCtx();
   return (
     <section className="section" aria-labelledby="h-chapters" id="sec-chapters" data-spy="chapters">
-      <SectionHead id="h-chapters" revisedAt={revised.chapters}>
+      <SectionHead id="h-chapters" revisedAt={revised.chapters} aside={<CopyButton label="chapters" getText={() => chaptersText(chapters)} />}>
         Chapters
       </SectionHead>
       {timestampNote && <p className="aside-note">{timestampNote}</p>}
