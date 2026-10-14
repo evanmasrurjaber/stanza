@@ -134,7 +134,7 @@ export const ChapterSchema = z.object({
 
 export const OverviewSchema = z.object({
   summary: z.string().min(1).max(10_000),
-  summarySentences: z.array(CitedSentenceSchema).max(30).optional(),
+  summarySentences: z.array(CitedSentenceSchema).max(30),
   themes: z.array(z.string().max(300)).max(20),
   takeaways: z.array(CitedSentenceSchema).max(30),
   chapters: z.array(ChapterSchema).min(1).max(40),

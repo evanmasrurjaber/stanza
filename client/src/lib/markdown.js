@@ -17,8 +17,7 @@ export function toMarkdown({ title, result, segments }) {
   const checked = (v) =>
     v ? (v.status === 'unchecked' ? '_Not independently fact-checked._' : `_${v.status === 'partial' ? 'Partly fact-checked' : 'Fact-checked'} against the cited transcript paragraphs${v.checker ? ` (${v.checker})` : ''}._`) : null;
   out.push('## Summary', '');
-  if (overview.summarySentences?.length) out.push(overview.summarySentences.map((s) => `${s.text} (${ref(s.segmentIds, byId)})`).join(' '), '');
-  else out.push(overview.summary, '');
+  out.push(overview.summarySentences.map((s) => `${s.text} (${ref(s.segmentIds, byId)})`).join(' '), '');
   if (checked(overview.verification)) out.push(checked(overview.verification), '');
   if (overview.themes.length) out.push(`**Themes:** ${overview.themes.join(' · ')}`, '');
 

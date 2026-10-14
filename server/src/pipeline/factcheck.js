@@ -26,7 +26,7 @@ import {
  */
 
 // Evidence tokens per judge call. With claims, output and reasoning this keeps a call around 4K tokens.
-export const EVIDENCE_TOKEN_BUDGET = 2400;
+const EVIDENCE_TOKEN_BUDGET = 2400;
 const NEIGHBOURS = 1;
 
 const REASON_TEXT = {

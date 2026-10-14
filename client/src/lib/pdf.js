@@ -30,7 +30,7 @@ const clean = (s) =>
     .trim();
 
 /** Build the PDF document (exported separately so it can be tested without a browser download). */
-export async function buildPdf({ title, overview, quiz, segments = [] }) {
+async function buildPdf({ title, overview, quiz, segments = [] }) {
   const startOf = new Map(segments.map((s) => [s.id, s.start]));
   const { jsPDF } = await import('jspdf');
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
@@ -99,7 +99,7 @@ export async function buildPdf({ title, overview, quiz, segments = [] }) {
 
   // Summary
   heading('Summary');
-  const summary = overview.summarySentences?.length ? overview.summarySentences.map((s) => s.text).join(' ') : overview.summary;
+  const summary = overview.summarySentences.map((s) => s.text).join(' ');
   para(summary, { size: 11.5 });
   if (overview.themes?.length) para(`Themes: ${overview.themes.join(', ')}`, { family: 'helvetica', size: 9.5, color: MUTED });
   if (status(overview.verification)) para(status(overview.verification), { family: 'helvetica', style: 'italic', size: 9, color: MUTED });

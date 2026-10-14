@@ -1,11 +1,11 @@
 /**
- * Talks to the Stanza API (see docs/api.md).
+ * Talks to the Stanza API.
  *
  * Every failure is thrown as an ApiError with the server's error shape
  * ({ code, category, message, provider, stage, retryable, retryAfterSeconds, attempts }),
  * plus two client-only categories: "network" (no response at all) and "aborted" (user cancelled).
  */
-export const API_BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
+const API_BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
 const NDJSON = 'application/x-ndjson';
 
 export class ApiError extends Error {

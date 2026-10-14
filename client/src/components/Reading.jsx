@@ -5,7 +5,7 @@ import { chaptersText, copyText, summaryText, takeawaysText } from '../lib/plain
 
 /** { segById, cite(id), highlight: { id, n }, seek(seconds) | null } */
 export const EditionCtx = createContext(null);
-export const useEditionCtx = () => useContext(EditionCtx);
+const useEditionCtx = () => useContext(EditionCtx);
 
 /** A footnote-style reference to a numbered paragraph: "¶12 · 4:30". */
 export function Cite({ id, children }) {
@@ -103,7 +103,6 @@ function SectionHead({ id, children, revisedAt, aside }) {
 
 export function Overview({ overview, revised }) {
   const v = overview.verification;
-  const sentences = overview.summarySentences;
   return (
     <section className="section" aria-labelledby="h-summary" id="sec-summary" data-spy="summary">
       <SectionHead
@@ -119,26 +118,19 @@ export function Overview({ overview, revised }) {
         Summary
       </SectionHead>
       <div className="prose" key={revised.summary ?? 0}>
-        {sentences?.length ? (
-          <p>
-            {sentences.map((s, i) => (
-              <span key={i} className="sentence">
-                {s.text}
-                {s.segmentIds[0] && (
-                  <>
-                    {' '}
-                    <Cite id={s.segmentIds[0]} />
-                  </>
-                )}{' '}
-              </span>
-            ))}
-          </p>
-        ) : (
-          overview.summary
-            .split(/\n{2,}/)
-            .filter(Boolean)
-            .map((p, i) => <p key={i}>{p}</p>)
-        )}
+        <p>
+          {overview.summarySentences.map((s, i) => (
+            <span key={i} className="sentence">
+              {s.text}
+              {s.segmentIds[0] && (
+                <>
+                  {' '}
+                  <Cite id={s.segmentIds[0]} />
+                </>
+              )}{' '}
+            </span>
+          ))}
+        </p>
       </div>
       <Removed items={v?.removed?.filter((r) => r.section === 'summary')} noun="sentence" />
       {overview.themes.length > 0 && (

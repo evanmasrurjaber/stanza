@@ -31,10 +31,10 @@ import { LLM_Quiz } from '../schemas/index.js';
 import { estimateLlmSeconds, startEstimate } from '../lib/progress.js';
 import { invalidInput } from '../lib/errors.js';
 
-export const MAX_TARGETS = 3;
+const MAX_TARGETS = 3;
 
 /** Preset buttons skip the router: fixed, known-good routes. */
-export const PRESET_ROUTES = {
+const PRESET_ROUTES = {
   shorter_summary: { targets: [{ section: 'summary', ids: [] }], instruction: 'Make the summary about half as long, keeping the most important points.' },
   simpler_summary: { targets: [{ section: 'summary', ids: [] }], instruction: 'Rewrite the summary in simpler language a 14-year-old could follow. Keep it the same length or shorter.' },
   harder_quiz: { targets: [{ section: 'quiz', ids: [] }], instruction: 'Make the quiz questions harder.', difficulty: 'harder' },

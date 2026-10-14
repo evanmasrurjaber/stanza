@@ -1,7 +1,7 @@
 import { formatClock } from '../transcript/timecodes.js';
 
 /** Evidence block: only the segments a batch needs, each once, in transcript order. */
-export function formatEvidence(segments) {
+function formatEvidence(segments) {
   return `<evidence>\n${segments.map((s) => `[${s.id}${s.start != null ? ` @ ${formatClock(s.start)}` : ''}] ${s.text}`).join('\n')}\n</evidence>`;
 }
 

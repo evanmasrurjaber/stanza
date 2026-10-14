@@ -1,7 +1,7 @@
 import { WORDS_PER_MINUTE } from '../transcript/segmenter.js';
 
-export const MIN_CHAPTER_MIN = 3;
-export const MAX_CHAPTER_MIN = 25;
+const MIN_CHAPTER_MIN = 3;
+const MAX_CHAPTER_MIN = 25;
 const MINUTES_PER_CHAPTER = 10;
 
 const wc = (s) => (s.match(/\S+/g) ?? []).length;
@@ -108,10 +108,4 @@ export function buildChapters(drafts, segments, { hasTimestamps }) {
   if (tooLong.length) errors.push(`Chapter(s) longer than ${MAX_CHAPTER_MIN} min: ${tooLong.map((c) => c.id).join(', ')}.`);
 
   return { value: chapters, errors };
-}
-
-/** Segment IDs covered by a chapter, inclusive. */
-export function chapterSegmentIds(chapter, segments) {
-  const ids = segments.map((s) => s.id);
-  return ids.slice(ids.indexOf(chapter.startSegmentId), ids.indexOf(chapter.endSegmentId) + 1);
 }

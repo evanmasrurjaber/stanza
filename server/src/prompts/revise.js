@@ -47,9 +47,7 @@ ${GROUNDING_RULES}
 const editorInstruction = (instruction) => `<editor_instruction>\n${instruction}\n</editor_instruction>`;
 
 export function summaryRevisionPrompt({ segments, overview, instruction }) {
-  const current = overview.summarySentences?.length
-    ? overview.summarySentences.map((s) => `- ${s.text} [${s.segmentIds.join(', ')}]`).join('\n')
-    : overview.summary;
+  const current = overview.summarySentences.map((s) => `- ${s.text} [${s.segmentIds.join(', ')}]`).join('\n');
   return `${formatTranscript(segments)}
 
 <current_summary>

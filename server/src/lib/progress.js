@@ -49,8 +49,6 @@ export function createProgress(emit = () => {}) {
   };
 }
 
-export const noopProgress = () => createProgress();
-
 /**
  * For steps with no real progress signal (an LLM or Whisper call), emit a time-based estimate
  * every few seconds, capped at 95% until the step actually finishes. Returns a stop function.

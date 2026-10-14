@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import multer from 'multer';
 import { unsupportedFormat } from '../lib/errors.js';
 
-export const UPLOAD_DIR = path.join(os.tmpdir(), 'stanza-uploads');
+const UPLOAD_DIR = path.join(os.tmpdir(), 'stanza-uploads');
 
 const extOf = (name) => path.extname(name ?? '').slice(1).toLowerCase();
 

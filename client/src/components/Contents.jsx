@@ -5,7 +5,7 @@ import { download, slug, toMarkdown } from '../lib/markdown.js';
 import { downloadPdf } from '../lib/pdf.js';
 
 /** Small custom player for the uploaded file (object URL, never sent anywhere else). */
-export function Player({ audioRef, src, time, duration, playing }) {
+function Player({ audioRef, src, time, duration, playing }) {
   return (
     <div className="player">
       <audio ref={audioRef} src={src} preload="metadata" />

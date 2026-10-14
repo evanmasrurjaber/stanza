@@ -6,7 +6,7 @@ import { clock } from './format.js';
  */
 
 export function summaryText(overview) {
-  const body = overview.summarySentences?.length ? overview.summarySentences.map((s) => s.text.trim()).join(' ') : overview.summary.trim();
+  const body = overview.summarySentences.map((s) => s.text.trim()).join(' ');
   return overview.themes?.length ? `${body}\n\nThemes: ${overview.themes.join(', ')}` : body;
 }
 

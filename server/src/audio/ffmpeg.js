@@ -74,10 +74,6 @@ export async function probeAudio(file, { signal } = {}) {
 }
 
 /** Back-compat helper used by older callers/tests. */
-export async function probeDuration(file, opts) {
-  return (await probeAudio(file, opts)).duration;
-}
-
 /**
  * Cut [start, start + duration) out of `input` WITHOUT re-encoding (stream copy). This costs
  * almost no CPU, which matters on a free instance where re-encoding runs ~60x slower than a laptop.

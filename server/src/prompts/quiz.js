@@ -9,7 +9,7 @@ const DIFFICULTY_GUIDE = {
   easier: 'Make the questions easy: test clearly stated main points, with clearly wrong distractors.',
 };
 
-export function chapterOutline(chapters) {
+function chapterOutline(chapters) {
   return chapters.map((c) => `${c.id} (${c.startSegmentId}–${c.endSegmentId}): ${c.title}`).join('\n');
 }
 

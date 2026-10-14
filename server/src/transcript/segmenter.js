@@ -2,8 +2,8 @@ import { invalidInput, noSpeech } from '../lib/errors.js';
 import { parseTimecodedText } from './timecodes.js';
 import { looksLikeSubtitles, parseSubtitles } from './subtitles.js';
 
-export const MIN_WORDS = 40;
-export const MAX_WORDS = 120;
+const MIN_WORDS = 40;
+const MAX_WORDS = 120;
 export const WORDS_PER_MINUTE = 150;
 
 const wordCount = (s) => (s.match(/\S+/g) ?? []).length;

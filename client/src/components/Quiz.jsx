@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight, Check, RotateCcw, X } from 'lucide-react';
 import { Cite, FactCheck, Removed } from './Reading.jsx';
 import { Errata } from './Errata.jsx';
 import { Notices } from './Proof.jsx';
-import { eta, plural } from '../lib/format.js';
+import { eta } from '../lib/format.js';
 
 const LETTERS = ['A', 'B', 'C', 'D'];
 

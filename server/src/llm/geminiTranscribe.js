@@ -4,10 +4,10 @@ import { AppError, clientAborted, modelOutputInvalid, providerUnavailable } from
 import { sleep } from '../lib/retry.js';
 import { mapGeminiError } from './gemini.js';
 
-export const GEMINI_TRANSCRIBE = 'Gemini Transcribe';
+const GEMINI_TRANSCRIBE = 'Gemini Transcribe';
 
 // Word timestamps cap a single request at 30 minutes of audio (1 hour without them).
-export const GEMINI_TRANSCRIBE_MAX_SECONDS = 30 * 60;
+const GEMINI_TRANSCRIBE_MAX_SECONDS = 30 * 60;
 
 const MIME = { mp3: 'audio/mp3', m4a: 'audio/m4a', mp4: 'audio/m4a', wav: 'audio/wav', ogg: 'audio/ogg', webm: 'audio/webm', flac: 'audio/flac', opus: 'audio/opus', aac: 'audio/aac' };
 export const mimeFor = (file) => MIME[path.extname(file).slice(1).toLowerCase()] ?? 'audio/mpeg';

@@ -12,7 +12,7 @@ function useTick(active) {
 }
 
 /** The server status, set like a press line on an edition cover. */
-export function PressLine({ server }) {
+function PressLine({ server }) {
   const now = useTick(server.status === 'waking' || server.status === 'offline');
   const waited = server.wakingSince ? clock((now - server.wakingSince) / 1000) : null;
 

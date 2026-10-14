@@ -8,7 +8,7 @@ import {
   providerUnavailable,
 } from '../lib/errors.js';
 
-export const GEMINI = 'Gemini';
+const GEMINI = 'Gemini';
 
 /**
  * Gemini adapter. Exposes the provider interface used by llm/structured.js:

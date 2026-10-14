@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getJson } from '../api/client.js';
 
-export const DEFAULT_LIMITS = {
+const DEFAULT_LIMITS = {
   transcript: { maxChars: 200_000, fileExtensions: ['txt', 'srt', 'vtt'] },
   audio: { maxMegabytes: 200, maxSeconds: 7200, extensions: ['mp3', 'm4a', 'wav', 'ogg', 'webm', 'flac'] },
   rateLimitPerMinute: 5,

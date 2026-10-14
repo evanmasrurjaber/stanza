@@ -3,7 +3,7 @@ import { createGroqChatProvider, createGroqWhisperProvider } from './groq.js';
 import { createGeminiTranscribeProvider } from './geminiTranscribe.js';
 
 // Groq's free tier allows ~8K tokens/min for gpt-oss-120b; leave room for the output.
-export const GROQ_FALLBACK_MAX_INPUT_TOKENS = 5000;
+const GROQ_FALLBACK_MAX_INPUT_TOKENS = 5000;
 
 /**
  * Build the provider set from config. Missing keys simply leave a slot empty;

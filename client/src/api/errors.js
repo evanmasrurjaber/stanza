@@ -2,7 +2,7 @@
  * Turn an ApiError into what the errata slip says: who is at fault, what happened,
  * and what the user can do about it.
  */
-export const STAGE_LABELS = {
+const STAGE_LABELS = {
   preparing: 'Compressing audio on your device',
   uploading: 'Uploading audio',
   validating: 'Checking your file',

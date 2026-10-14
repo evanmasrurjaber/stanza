@@ -10,8 +10,8 @@ import {
   providerUnavailable,
 } from '../lib/errors.js';
 
-export const GROQ = 'Groq';
-export const GROQ_WHISPER = 'Groq Whisper';
+const GROQ = 'Groq';
+const GROQ_WHISPER = 'Groq Whisper';
 
 // Per-minute waits are short; a longer retry-after means an hourly/daily bucket is empty.
 const MAX_SHORT_WAIT_MS = 60_000;
